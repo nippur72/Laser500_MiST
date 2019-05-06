@@ -108,7 +108,7 @@ always @(negedge clk_sys) begin
 
 	if(hs && ~HSync) begin
 		cnt    <= 0;
-		pixsz  <= (cnt >> 9) - 1;
+		pixsz  <= (cnt >> 9);   // (nippur72) makes pixel wider, was (cnt >> 9) - 1
 		pixcnt <= 0;
 		ce_pix <= 1;
 	end

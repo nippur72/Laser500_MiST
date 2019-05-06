@@ -3,16 +3,27 @@
 
 module VTL_chip 
 (	
-	input    F14M,	      // pixel clock
-   output   CPUCK,      // CPU clock to CPU (F14M / 4)
+	input    F14M,	           // pixel clock
+	input    RESET,           // reset signal
+		
+	// cpu interface
+   output       CPUCK,       // CPU clock to CPU (F14M / 4)
+	output       WAIT_n,      // WAIT (TODO handle wait states)
+	input        MREQ_n,      // MEMORY REQUEST (not used--yet) indicates the bus holds a valid memory address
+	input        IORQ_n,      // IO REQUEST 0=read from I/O
+	input        RD_n,        // READ       0=cpu reads
+	input        WR_n,        // WRITE      0=cpu writes
+	input [15:0] A,           // 16 bit address bus
+	input  [7:0] DO,          // 8 bit data output from cpu
+	output [7:0] DI,          // 8 bit data input for cpu
 	
-	/*
-	input        cpu_clk,
-	input        cpu_wr,
-	input [13:0] cpu_addr,
-	input [7:0]  cpu_data,
-	*/
-
+	// sdram interface
+	output [24:0] sdram_addr, // sdram address  
+	input   [7:0] sdram_dout, // sdram data ouput
+   output  [7:0] sdram_din,  // sdram data input
+	output        sdram_wr,   // sdram write
+	output        sdram_cs,   // sdram chip select
+	
 	// output to VGA screen
 	output hsync,
 	output vsync,
@@ -388,13 +399,25 @@ assign b =
 	pixel == 4'he ? { cole[3:0], 2'b00 } : 
 						 { colf[3:0], 2'b00 } ;
 
+	// ******************************************************************************						 
 						 
+   // TODO handle wait states
+	assign WAIT = 1;
+	
 	// derive CPUCK by dividing F14M by 4
 	reg [1:0] clk_div;
 	assign CPUCK = clk_div[1];
 	
 	always @(posedge F14M)
 		clk_div <= clk_div + 3'd1;
+
+	// bank switching
+	reg  [3:0]  banks[1:0];
+	wire        bank          = A[15:14];
+	wire        base_addr     = A[13:0];
+	wire [24:0] paged_address = { 7'd0, banks[bank], base_addr };
+	wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO mapped io, TODO 350/700 ram config
+	wire        mapped_io     = bank == 2;
 		
 endmodule
 
