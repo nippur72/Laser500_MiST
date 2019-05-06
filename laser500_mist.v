@@ -1,11 +1,16 @@
-// A simple system-on-a-chip (SoC) for the MiST
-// (c) 2015 Till Harbaum
+// Video Technology Laser 350/500/700 for the MiST
+//
+// Antonino Porcino nino.porcino@gmail.com
+//
+// Derived from source code by Till Harbaum (c) 2015
+//
 									  
-module laser500_mist ( 
+module laser500_mist 
+( 
    input [1:0] 	CLOCK_27,
 	
 	// SDRAM interface
-	inout [15:0]  	SDRAM_DQ, 		// SDRAM Data bus 16 Bits
+	inout  [15:0] 	SDRAM_DQ, 		// SDRAM Data bus 16 Bits
 	output [12:0] 	SDRAM_A, 		// SDRAM Address bus 13 Bits
 	output        	SDRAM_DQML, 	// SDRAM Low-byte Data Mask
 	output        	SDRAM_DQMH, 	// SDRAM High-byte Data Mask
@@ -17,7 +22,7 @@ module laser500_mist (
 	output 			SDRAM_CLK, 		// SDRAM Clock
 	output        	SDRAM_CKE, 		// SDRAM Clock Enable
   
-   // SPI interface to arm io controller
+   // SPI (serial-parallel) interface to ARM io controller
    output      	SPI_DO,
 	input       	SPI_DI,
    input       	SPI_SCK,
@@ -32,6 +37,12 @@ module laser500_mist (
    output [5:0] 	VGA_R,
    output [5:0] 	VGA_G,
    output [5:0] 	VGA_B
+	
+	// other
+	output         LED;
+	input          UART_RX;
+	output         AUDIO_L;
+	output         AUDIO_R;
 );
 
 wire pixel_clock;
