@@ -74,29 +74,23 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
 
 // include the on screen display
 
-osd #(
-	.OSD_X_OFFSET(0),
-	.OSD_Y_OFFSET(0),
-	.OSD_COLOR(4)
-) osd (
-   .pclk       ( F14M         ),
+osd osd (
+   .clk_sys    ( F14M         ),
 
    // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
+   .SPI_DI     ( SPI_DI       ),
+   .SPI_SCK    ( SPI_SCK      ),
+   .SPI_SS3    ( SPI_SS3      ),
 
-   .red_in     ( video_r      ),
-   .green_in   ( video_g      ),
-   .blue_in    ( video_b      ),
-   .hs_in      ( video_hs     ),
-   .vs_in      ( video_vs     ),
+   .R_in       ( video_r      ),
+   .G_in       ( video_g      ),
+   .B_in       ( video_b      ),
+   .HSync      ( video_hs     ),
+   .VSync      ( video_vs     ),
 
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
+   .R_out      ( VGA_R        ),
+   .G_out      ( VGA_G        ),
+   .B_out      ( VGA_B        )   
 );
                           
 //
