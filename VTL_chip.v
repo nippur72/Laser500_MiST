@@ -22,8 +22,8 @@ module VTL_chip
 );
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
-parameter hsw = 67;         // hsync width
-parameter hbp = 71;         // horizontal back porch, unused time after hsync
+parameter hsw = 66;         // hsync width
+parameter hbp = 70;         // horizontal back porch, unused time after hsync
 
 parameter HEIGHT              = 192;  // height of active area  
 parameter TOP_BORDER_WIDTH    =  68;  // top border
@@ -31,8 +31,8 @@ parameter BOTTOM_BORDER_WIDTH =  52;  // bottom
 parameter V                   = 312;  // number of lines
 
 parameter WIDTH               = 640;  // width of active area  
-parameter LEFT_BORDER_WIDTH   =  64;  // left border
-parameter RIGHT_BORDER_WIDTH  =  94;  // right border
+parameter LEFT_BORDER_WIDTH   =  80;  // left border
+parameter RIGHT_BORDER_WIDTH  =  78;  // right border
 parameter H                   = 798;  // width of visible area
 
 reg[9:0]   hcnt;          // horizontal pixel counter
