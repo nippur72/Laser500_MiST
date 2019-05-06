@@ -138,14 +138,21 @@ end
 // RAM (SDRAM)
 //
 			
+// bank switching
+reg  [3:0]  banks[1:0];
+wire        bank          = cpu_addr[15:14];
+wire        base_addr     = cpu_addr[13:0];
+wire [19:0] paged_address = { 7'd0, banks[bank], base_addr };
+wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO mapped io, TODO 350/700 ram config
+			
 // SDRAM control signals
 wire ram_clock;
 assign SDRAM_CKE = 1'b1;
 
 // during ROM download data_io writes the ram. Otherwise the CPU
 wire [7:0]  sdram_din  = dio_download ? dio_data  : cpu_dout;
-wire [24:0] sdram_addr = dio_download ? dio_addr  : { 9'd0, cpu_addr[15:0] };
-wire        sdram_wr   = dio_download ? dio_write : (!cpu_wr_n && cpu_addr[15]);   // TODO ROM write only management
+wire [24:0] sdram_addr = dio_download ? dio_addr  : paged_address;
+wire        sdram_wr   = dio_download ? dio_write : bank_is_ram;    // TODO ROM write only management
 wire        sdram_cs   = dio_download ? 1'b1 : !cpu_rd_n;
 
 sdram sdram (
