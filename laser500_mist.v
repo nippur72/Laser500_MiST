@@ -7,7 +7,7 @@
 									  
 module laser500_mist 
 ( 
-   input [1:0] 	CLOCK_27,
+   input [1:0] 	CLOCK_27,      // 27 MHz board clock 
 	
 	// SDRAM interface
 	inout  [15:0] 	SDRAM_DQ, 		// SDRAM Data bus 16 Bits
@@ -36,43 +36,45 @@ module laser500_mist
    output 	 		VGA_VS,
    output [5:0] 	VGA_R,
    output [5:0] 	VGA_G,
-   output [5:0] 	VGA_B
+   output [5:0] 	VGA_B,
 	
 	// other
-	output         LED;
-	input          UART_RX;
-	output         AUDIO_L;
-	output         AUDIO_R;
+	output         LED,
+	input          UART_RX,
+	output         AUDIO_L,
+	output         AUDIO_R
 );
 
-
-// the configuration string is returned to the io controller to allow
-// it to control the menu on the OSD 
+// menu configuration string passed to user_io
 parameter CONF_STR = {
-        "Laser500;;",
-        "O1,Scanlines,On,Off;",
-        "T2,Reset"
+	"Laser500;;",
+	"O1,Scanlines,On,Off;",
+	"T2,Reset"
 };
 
 parameter CONF_STR_LEN = 10+20+8;
 
-// the status register is controlled by the on screen display (OSD)
-wire [7:0] status;
+wire [7:0] status;       // the status register is controlled by the on screen display (OSD)
 
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
-		.conf_str   ( CONF_STR   ),
+	.conf_str   ( CONF_STR   ),
 
-		.SPI_CLK    ( SPI_SCK    ),
-      .SPI_SS_IO  ( CONF_DATA0 ),
-      .SPI_MISO   ( SPI_DO     ),
-      .SPI_MOSI   ( SPI_DI     ),
+	.SPI_CLK    ( SPI_SCK    ),
+	.SPI_SS_IO  ( CONF_DATA0 ),
+	.SPI_MISO   ( SPI_DO     ),
+	.SPI_MOSI   ( SPI_DI     ),
 
-		.status     ( status     )
+	.status     ( status     )
 );
 
 // include the on screen display
-osd #(0,0,4) osd (
+
+osd #(
+	.OSD_X_OFFSET(0),
+	.OSD_Y_OFFSET(0),
+	.OSD_COLOR(4)
+) osd (
    .pclk       ( pixel_clock  ),
 
    // spi for OSD
