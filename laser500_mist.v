@@ -45,7 +45,6 @@ module laser500_mist
 	output         AUDIO_R;
 );
 
-wire pixel_clock;
 
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
@@ -55,7 +54,7 @@ parameter CONF_STR = {
         "T2,Reset"
 };
 
-parameter CONF_STR_LEN = 9+20+8;
+parameter CONF_STR_LEN = 10+20+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -94,6 +93,7 @@ osd #(0,0,4) osd (
    .vs_out     ( VGA_VS       )
 );
                           
+wire pixel_clock;
 wire [5:0] video_r, video_g, video_b;
 wire video_hs, video_vs;
 		  
