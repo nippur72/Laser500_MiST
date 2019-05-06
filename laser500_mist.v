@@ -144,6 +144,7 @@ wire        bank          = cpu_addr[15:14];
 wire        base_addr     = cpu_addr[13:0];
 wire [19:0] paged_address = { 7'd0, banks[bank], base_addr };
 wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO mapped io, TODO 350/700 ram config
+wire        mapped_io     = bank == 2;
 			
 // SDRAM control signals
 wire ram_clock;
