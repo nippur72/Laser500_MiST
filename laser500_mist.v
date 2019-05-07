@@ -60,19 +60,7 @@ wire st_poweron  = status[0];
 wire st_scalines = status[1];
 wire st_reset    = status[2];
 
-// include user_io module for arm controller communication
-user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
-	.conf_str   ( CONF_STR   ),
-
-	.SPI_CLK    ( SPI_SCK    ),
-	.SPI_SS_IO  ( CONF_DATA0 ),
-	.SPI_MISO   ( SPI_DO     ),
-	.SPI_MOSI   ( SPI_DI     ),
-
-	.status     ( status     )
-);
-
-// include the on screen display
+// on screen display
 
 osd osd (
    .clk_sys    ( F14M         ),
@@ -92,7 +80,51 @@ osd osd (
    .G_out      ( VGA_G        ),
    .B_out      ( VGA_B        )   
 );
-                          
+       
+wire [7:0] joystick_0;
+wire [7:0] joystick_1;
+
+// include user_io module for arm controller communication
+user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
+	.conf_str   ( CONF_STR   ),
+
+	.SPI_CLK    ( SPI_SCK    ),
+	.SPI_SS_IO  ( CONF_DATA0 ),
+	.SPI_MISO   ( SPI_DO     ),
+	.SPI_MOSI   ( SPI_DI     ),
+
+	.status     ( status     ),
+	 
+	// ps2 interface
+	.ps2_clk        ( ps2_clock      ),
+	.ps2_kbd_clk    ( ps2_kbd_clk    ),
+	.ps2_kbd_data   ( ps2_kbd_data   ),
+	.ps2_mouse_clk  ( ps2_mouse_clk  ),
+	.ps2_mouse_data ( ps2_mouse_data ),
+	 
+	.joystick_0 ( joystick_0 ),
+	.joystick_1 ( joystick_1 )
+);
+
+// the MiST emulates a PS2 keyboard and mouse
+wire ps2_kbd_clk, ps2_kbd_data;
+
+wire [13:0] KA;
+wire [ 7:0] KD;
+
+keyboard keyboard 
+(
+	.reset    ( cpu_reset    ),
+	.clk      ( F14M         ),
+
+	.ps2_clk  ( ps2_kbd_clk  ),
+	.ps2_data ( ps2_kbd_data ),
+	
+	.KD     ( KD         ),
+	.KA     ( KA         )
+);
+		 
+		 
 //
 // VTL CHIP GA1
 //

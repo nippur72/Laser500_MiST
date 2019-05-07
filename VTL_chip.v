@@ -491,5 +491,8 @@ TODO
 - rom loading
 - memory init
 - out ports
+- joystick emulation
+- strlen for osd
+- move files into mist folder
 */
 
