@@ -105,27 +105,44 @@ wire       video_hs;
 wire       video_vs;
 		  
 // VTL custom chip
-VTL_chip VTL_chip (	
+VTL_chip VTL_chip 
+(	
+	.RESET  ( cpu_reset   ),
 	.F14M   ( F14M        ),
-   .CPUCK  ( CPUCK       ),
-	.hsync  ( hsync       ),
-	.vsync  ( vsync       ),
+	
+	// cpu
+   .CPUCK    ( CPUCK         ),
+	.MREQ_n   ( cpu_mreq_n    ),	
+	.IORQ_n   ( cpu_iorq_n    ),
+	.RD_n     ( cpu_rd_n      ), 
+	.WR_n     ( cpu_wr_n      ),
+	.A        ( cpu_addr      ),
+	.DI       ( cpu_din       ),
+	.DO       ( cpu_dout      ),
+		
+	// video
+	.hsync  ( video_hs    ),
+	.vsync  ( video_vs    ),
 	.r      ( video_r     ),
 	.g      ( video_g     ),
 	.b      ( video_b     )
 );
 
-// The CPU is kept in reset for further 256 cyckes after the PLL is generating stable clocks
+// TODO add scandoubler
+assign VGA_HS = ~(~video_hs | ~video_vs);
+assign VGA_VS = 1;
+
+// The CPU is kept in reset for further 256 cycles after the PLL is generating stable clocks
 // to make sure things like the SDRAM have some time to initialize
 
-reg [7:0] cpu_reset_cnt = 8'h00;
-wire cpu_reset = (cpu_reset_cnt != 255);
-always @(posedge CPUCK) begin
+reg [9:0] cpu_reset_cnt = 0;
+wire cpu_reset = (cpu_reset_cnt != 1023);
+always @(posedge F14M) begin
 	if(!pll_locked || st_poweron || st_reset || dio_download)
-		cpu_reset_cnt <= 8'd0;
+		cpu_reset_cnt <= 0;
 	else 
-		if(cpu_reset_cnt != 255)
-			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
+		if(cpu_reset_cnt != 1023)
+			cpu_reset_cnt <= cpu_reset_cnt + 1;
 end
 			
 //
@@ -136,7 +153,7 @@ end
 reg  [3:0]  banks[1:0];
 wire        bank          = cpu_addr[15:14];
 wire        base_addr     = cpu_addr[13:0];
-wire [19:0] paged_address = { 7'd0, banks[bank], base_addr };
+wire [24:0] paged_address = { 7'd0, banks[bank], base_addr };
 wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO mapped io, TODO 350/700 ram config
 wire        mapped_io     = bank == 2;
 			
@@ -149,6 +166,7 @@ wire [7:0]  sdram_din  = dio_download ? dio_data  : cpu_dout;
 wire [24:0] sdram_addr = dio_download ? dio_addr  : paged_address;
 wire        sdram_wr   = dio_download ? dio_write : bank_is_ram;    // TODO ROM write only management
 wire        sdram_cs   = dio_download ? 1'b1 : !cpu_rd_n;
+wire [7:0]  sdram_dout;
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip
@@ -188,26 +206,27 @@ wire        cpu_wr_n;
 wire        cpu_mreq_n;
 wire        cpu_m1_n;
 wire        cpu_iorq_n;
+wire        cpu_wait_n;
 
 // include Z80 CPU
 T80s T80s (
 	.RESET_n  ( !cpu_reset    ),   // TODO connect to RESET key
 	.CLK_n    ( CPUCK         ),   // TODO is it negated or not? is it in phase with F14M ?
-	.WAIT_n   ( 1'b1          ),   // TODO connect to wait line
+	.WAIT_n   ( cpu_wait_n    ),   // TODO connect to wait line
 	.INT_n    ( vsync         ),   // VSYNC interrupt
 	.NMI_n    ( 1'b1          ),   // connected to VCC
 	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
-	.MREQ_n   ( cpu_mreq_n    ),
-	.M1_n     ( cpu_m1_n      ),
-	.IORQ_n   ( cpu_iorq_n    ),
-	.RD_n     ( cpu_rd_n      ), 
-	.WR_n     ( cpu_wr_n      ),
-	.A        ( cpu_addr      ),
-	.DI       ( cpu_din       ),
-	.DO       ( cpu_dout      )
+	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
+	.M1_n     ( cpu_m1_n      ),   // M1==0 && MREQ==0 cpu is fetching, M1==0 && IORQ==0 ack interrupt
+	.IORQ_n   ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
+	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
+	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
+	.A        ( cpu_addr      ),   // 16 bit address bus
+	.DI       ( cpu_din       ),   // 8 bit data bus (input)
+	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
 
-wire [7:0] sdram_dout;
+
 assign cpu_din = sdram_dout;
 
 //
