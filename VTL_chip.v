@@ -186,6 +186,66 @@ always@(posedge F14M) begin
 			sdram_cs <= 0;
 		end	
 
+		// Z80 IO ports
+		if(IORQ_n == 0) begin
+			if(RD_n == 0) begin
+				DI <= 0; // TODO implement I/O read
+					/*
+					switch(port & 0xFF) {
+					case 0x40: return banks[0];
+					case 0x41: return banks[1];
+					case 0x42: return banks[2];
+					case 0x43: return banks[3];
+					case 0x2b: return joy0;  // joystick 8 directions
+					case 0x27: return joy1;  // joystick fire buttons      
+					case 0x00: return printerReady;                  
+					case 0x2e: return 0x00;  // joystick 2 not emulated yet
+					case 0x10:
+					case 0x11:
+					case 0x12:
+					case 0x13:
+					case 0x14:
+						return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   
+					*/
+			end
+			if(WR_n == 0) begin
+				case(A[7:0])
+					'h40: banks[0] <= DO[3:0];
+					'h41: banks[1] <= DO[3:0];
+					'h42: banks[2] <= DO[3:0];
+					'h43: banks[3] <= DO[3:0];
+					'h44:
+						begin	
+							vdc_page_7         <= !DO[3];
+							vdc_text80_enabled <= DO[0]; 
+							vdc_border_color   <= DO[7:4];
+							if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              
+							if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
+							if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
+							if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
+							if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
+							if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
+						end
+					'h45:
+						begin
+							vdc_text80_foreground = DO[7:4];
+							vdc_text80_background = DO[3:0];         
+						end
+					'h0d: ;
+						// printerWrite(value);
+					'h0e: ;
+						// printer port duplicated here							
+					'h10: ;
+					'h11: ;
+					'h12: ;
+					'h13: ;
+					'h14: ;
+						//if(emulate_fdc) floppy_write_port(port & 0xFF, value); 
+						//return;     				
+				endcase				
+			end
+		end
+   				
 		// counters
 		if(hcnt == hsw+hbp+H+hfp-1) 
 		begin
@@ -490,9 +550,11 @@ TODO
 - keyboard
 - rom loading
 - memory init
-- out ports
-- joystick emulation
-- strlen for osd
+- joystick, printer emulation
 - move files into mist folder
+- ram remove phased clock
+- decode (make sense out of) vdc_graphic_mode_number bits
+- ena signal on the cpu
+- scandoubler / vga resolution?
 */
 
