@@ -52,8 +52,6 @@ parameter CONF_STR = {
 	"T2,Reset"
 };
 
-parameter CONF_STR_LEN = 10+20+8;
-
 wire [7:0] status;       // the status register is controlled by the on screen display (OSD)
 
 wire st_poweron  = status[0];
@@ -85,7 +83,9 @@ wire [7:0] joystick_0;
 wire [7:0] joystick_1;
 
 // include user_io module for arm controller communication
-user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
+user_io #(
+	.STRLEN($size(CONF_STR)>>3)
+) user_io ( 
 	.conf_str   ( CONF_STR   ),
 
 	.SPI_CLK    ( SPI_SCK    ),
