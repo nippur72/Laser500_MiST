@@ -243,9 +243,10 @@ wire        cpu_iorq_n;
 wire        cpu_wait_n;
 
 // include Z80 CPU
-T80s T80s (
+T80se T80se (
 	.RESET_n  ( !cpu_reset    ),   // TODO connect to RESET key
-	.CLK_n    ( CPUCK         ),   // TODO is it negated or not? is it in phase with F14M ?
+	.CLK_n    ( F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
+	.CLKEN    ( CPUENA        ),   // CPU enable
 	.WAIT_n   ( cpu_wait_n    ),   // TODO connect to wait line
 	.INT_n    ( vsync         ),   // VSYNC interrupt
 	.NMI_n    ( 1'b1          ),   // connected to VCC

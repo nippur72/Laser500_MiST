@@ -7,7 +7,8 @@ module VTL_chip
 	input    RESET,           // reset signal
 		
 	// cpu interface
-   output           CPUCK,       // CPU clock to CPU (F14M / 4)
+   output           CPUCK,       // CPU clock to CPU (F14M / 4) - (not used on the MiST, we use F14M & CPUENA)
+	output           CPUENA,      // CPU enabled signal
 	output reg       WAIT_n,      // WAIT (TODO handle wait states)
 	input            MREQ_n,      // MEMORY REQUEST (not used--yet) indicates the bus holds a valid memory address
 	input            IORQ_n,      // IO REQUEST 0=read from I/O
@@ -136,9 +137,10 @@ assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number === 5 || vdc_g
 // calculate x offset (TODO replace with hcnt or clk_div?)
 assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
 
-reg [2:0] clk_div;           // clock divider and bus slot assignment
-assign CPUCK  = clk_div[1];  // derive CPUCK by dividing F14M by 4
-wire   CV     = ~clk_div[2]; // CV=1 video owns bus, CV=0 CPU owns bus
+reg [2:0] clk_div;            // clock divider and bus slot assignment
+assign CPUCK  = clk_div[1];   // derive CPUCK by dividing F14M by 4
+assign CPUENA = clk_div == 4; // CPU enabled signal
+wire   CV     = ~clk_div[2];  // CV=1 video owns bus, CV=0 CPU owns bus
 
 always@(posedge F14M) begin
 
@@ -547,7 +549,7 @@ endmodule
 
 /*
 TODO
-- keyboard
+- keyboard keys / map KA, KD
 - rom loading
 - memory init
 - joystick, printer emulation
