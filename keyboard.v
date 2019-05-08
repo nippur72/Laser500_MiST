@@ -11,7 +11,7 @@ module keyboard (
 	output reg [ 6:0] KD    // KD  7 column lines mapped into data bus    
 );
 
-wire [7:0] byte;
+wire [7:0] databyte;
 wire valid;
 wire error;
 
@@ -110,17 +110,17 @@ always @(posedge clk) begin
 	end else begin
 		// ps2 decoder has received a valid byte
 		if(valid) begin
-			if(byte == 8'he0) 
+			if(databyte == 8'he0) 
 				// extended key code
             key_extended <= 1'b1;
-         else if(byte == 8'hf0)
+         else if(databyte == 8'hf0)
 				// release code
             key_released <= 1'b1;
          else begin
 				key_extended <= 1'b0;
 				key_released <= 1'b0;
 				
-				case(byte)
+				case(databyte)
 					KEY_SHIFT        : begin KA['h0] <= key_released; KD[6] <= key_released; end
 					KEY_Z            : begin KA['h0] <= key_released; KD[5] <= key_released; end 
 					KEY_X            : begin KA['h0] <= key_released; KD[4] <= key_released; end 
@@ -213,9 +213,9 @@ ps2_intf ps2_keyboard (
 	
 	// Byte-wide data interface - only valid for one clock
 	// so must be latched externally if required
-	.DATA		  ( byte   ),
-	.VALID	  ( valid  ),
-	.ERROR	  ( error  )
+	.DATA		  ( databyte ),
+	.VALID	  ( valid    ),
+	.ERROR	  ( error    )
 );
 
 

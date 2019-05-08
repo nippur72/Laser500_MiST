@@ -46,11 +46,13 @@ module laser500_mist
 );
 
 // menu configuration string passed to user_io
-parameter CONF_STR = {
+localparam CONF_STR = {
 	"Laser500;;",
 	"O1,Scanlines,On,Off;",
 	"T2,Reset"
 };
+
+localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
 wire [7:0] status;       // the status register is controlled by the on screen display (OSD)
 
@@ -84,7 +86,7 @@ wire [7:0] joystick_1;
 
 // include user_io module for arm controller communication
 user_io #(
-	.STRLEN($size(CONF_STR)>>3)
+	.STRLEN(CONF_STR_LEN)
 ) user_io ( 
 	.conf_str   ( CONF_STR   ),
 
