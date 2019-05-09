@@ -38,8 +38,8 @@ parameter hsw = 66;         // hsync width
 parameter hbp = 78;         // horizontal back porch, unused time after hsync
 
 parameter HEIGHT              = 192;  // height of active area  
-parameter TOP_BORDER_WIDTH    =  68;  // top border
-parameter BOTTOM_BORDER_WIDTH =  52;  // bottom
+parameter TOP_BORDER_WIDTH    =  72;  // top border
+parameter BOTTOM_BORDER_WIDTH =  48;  // bottom
 parameter V                   = 312;  // number of lines
 
 parameter WIDTH               = 640;  // width of active area  
@@ -62,6 +62,8 @@ reg[7:0]  ramDataD;       // data read from RAM at previous step
 reg[13:0] ramAddress;     // address in video RAM to read from
 reg[12:0] charsetAddress; // address in charset ROM to read from
 wire[7:0] charsetQ;       // data ream from charset ROM
+
+reg[7:0]  ramQ;    // test
 
 reg [3:0] pixel;          // pixel to draw (color index in the palette)
 
@@ -142,6 +144,25 @@ assign CPUCK  = clk_div[1];   // derive CPUCK by dividing F14M by 4
 assign CPUENA = clk_div == 4; // CPU enabled signal
 wire   CV     = ~clk_div[2];  // CV=1 video owns bus, CV=0 CPU owns bus
 
+/*
+Details of the state machine:
+ 
+VIDEO T=0
+VIDEO T=1	
+VIDEO T=2
+VIDEO T=3  
+				finish video RAM read
+				starts charset ROM reading
+			   if cpu read/write put CPU in wait state and initiate read/write cpu RAM 
+            
+CPU   T=4
+CPU   T=5
+CPU   T=6
+CPU   T=7  
+				end charset ROM reading, start video RAM reading
+				if CPU wait state, finish cpu RAM read/write, release CPU wait, present data to cpu
+*/
+
 always@(posedge F14M) begin
 
 	if(RESET) begin
@@ -154,6 +175,7 @@ always@(posedge F14M) begin
 		banks[2] <= 0;
 		banks[3] <= 0;
 		WAIT_n <= 1;
+		sdram_cs <= 0;
 	end
 	else begin	
 	
@@ -173,8 +195,8 @@ always@(posedge F14M) begin
 				speaker_B                <= DO[5];
 				io_bit_4                 <= DO[4];
 				vdc_graphic_mode_enabled <= DO[3];
-				cassette_bit_out         <= DO[2];  
-				cassette_bit_out_l       <= DO[1]; 
+				cassette_bit_out         <= DO[2];
+				cassette_bit_out_l       <= DO[1];
 				speaker_A                <= DO[0];
 			end
 		end
@@ -191,7 +213,8 @@ always@(posedge F14M) begin
 		// Z80 IO ports
 		if(IORQ_n == 0) begin
 			if(RD_n == 0) begin
-				DI <= 0; // TODO implement I/O read
+				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
+				// TODO implement I/O read
 					/*
 					switch(port & 0xFF) {
 					case 0x40: return banks[0];
@@ -263,14 +286,14 @@ always@(posedge F14M) begin
 		end
 		else hcnt <= hcnt + 10'd1;
       
-		/*		
+		// test		
 		if(xcnt[3:0] == 14) begin
 			ramQ <= (xcnt >> 4) + 35 + (ycnt >> 3);
 		end   
 		else if(xcnt[3:0] == 6) begin
 			ramQ <= 8'hf1;
 		end   		
-		*/
+		
 	
 		// draw pixel at hcnt,vcnt
 		if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
@@ -345,7 +368,7 @@ always@(posedge F14M) begin
 
 		// T=3 read character from RAM and stores into latch "ramData", starts ROM reading   
 		if(xcnt[2:0] == 3) begin
-			ramData <= sdram_dout;
+			ramData <= ramQ; // sdram_dout;
 			sdram_cs <= 0;
 			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra
 		end
@@ -380,7 +403,7 @@ always@(posedge F14M) begin
 						ramAddress[ 6] <= ycnt[7];
 						ramAddress[ 5] <= ycnt[6];
 						ramAddress[ 4] <= ycnt[7];
-						ramAddress[ 3] <= ycnt[6];         
+						ramAddress[ 3] <= ycnt[6];
 						ramAddress[2:0] <= 0;
 					end else if(vdc_graphic_mode_number === 0) begin
 						// GR 0            
@@ -553,10 +576,9 @@ TODO
 - rom loading
 - memory init
 - joystick, printer emulation
-- move files into mist folder
-- ram remove phased clock
 - decode (make sense out of) vdc_graphic_mode_number bits
 - ena signal on the cpu
 - scandoubler / vga resolution?
+- sdram frame buffer?
 */
 

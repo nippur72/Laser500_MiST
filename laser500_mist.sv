@@ -85,9 +85,7 @@ wire [7:0] joystick_0;
 wire [7:0] joystick_1;
 
 // include user_io module for arm controller communication
-user_io #(
-	.STRLEN(CONF_STR_LEN)
-) user_io ( 
+user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
 	.conf_str   ( CONF_STR   ),
 
 	.SPI_CLK    ( SPI_SCK    ),
@@ -109,7 +107,8 @@ user_io #(
 );
 
 // the MiST emulates a PS2 keyboard and mouse
-wire ps2_kbd_clk, ps2_kbd_data;
+wire ps2_kbd_clk;
+wire ps2_kbd_data;
 
 wire [13:0] KA;
 wire [ 7:0] KD;
@@ -146,6 +145,7 @@ VTL_chip VTL_chip
 	
 	// cpu
    .CPUCK    ( CPUCK         ),
+	.CPUENA   ( CPUENA        ),
 	.MREQ_n   ( cpu_mreq_n    ),	
 	.IORQ_n   ( cpu_iorq_n    ),
 	.RD_n     ( cpu_rd_n      ), 
@@ -183,17 +183,11 @@ end
 // RAM (SDRAM)
 //
 			
-// bank switching
-reg  [3:0]  banks[1:0];
-wire        bank          = cpu_addr[15:14];
-wire        base_addr     = cpu_addr[13:0];
-wire [24:0] paged_address = { 7'd0, banks[bank], base_addr };
-wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO mapped io, TODO 350/700 ram config
-wire        mapped_io     = bank == 2;
 			
 // SDRAM control signals
 wire ram_clock;
 assign SDRAM_CKE = 1'b1;
+assign SDRAM_CLK = ram_clock;
 
 // during ROM download data_io writes the ram. Otherwise the CPU
 wire [7:0]  sdram_din  = dio_download ? dio_data  : cpu_dout;
@@ -232,6 +226,7 @@ sdram sdram (
 	
 // CPU control signals
 wire        CPUCK;
+wire        CPUENA;
 wire [15:0] cpu_addr;
 wire [7:0]  cpu_din;
 wire [7:0]  cpu_dout;
@@ -261,7 +256,6 @@ T80se T80se (
 	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
 
-
 assign cpu_din = sdram_dout;
 
 //
@@ -289,7 +283,6 @@ data_io data_io (
    .data  ( dio_data  )
 );
 
-
 //
 // clocks
 //
@@ -300,8 +293,7 @@ pll pll (
 	 .inclk0 ( CLOCK_27[0]   ),
 	 .locked ( pll_locked    ),        // PLL is running stable
 	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
-	 .c1     ( ram_clock     ),        // RAM clock 81 MHz  
-	 .c2     ( SDRAM_CLK     )         // RAM clock 81 MHz slightly phase shifted
+	 .c1     ( ram_clock     )         // F14M x 4 	 
 );
 
 endmodule
