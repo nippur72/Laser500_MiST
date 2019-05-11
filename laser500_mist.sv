@@ -4,7 +4,7 @@
 //
 // Derived from source code by Till Harbaum (c) 2015
 //
-									  
+/*									  
 module laser500_mist 
 ( 
    input [1:0] 	CLOCK_27,      // 27 MHz board clock 
@@ -125,7 +125,67 @@ keyboard keyboard
 	.KA     ( KA         )
 );
 		 
+//
+// data_io
+//
+
+wire        dio_download;
+wire [24:0] dio_addr;
+wire [7:0]  dio_data;
+wire        dio_write;
+
+// include ROM download helper
+data_io data_io (
+	// io controller spi interface
+   .sck	( SPI_SCK ),
+   .ss	( SPI_SS2 ),
+   .sdi	( SPI_DI  ),
+
+	.downloading ( dio_download ),  // signal indicating an active rom download
+	         
+   // external ram interface
+   .clk   ( F14M      ),
+   .wr    ( dio_write ),
+   .addr  ( dio_addr  ),
+   .data  ( dio_data  )
+);
 		 
+//
+// Z80 CPU
+//
+	
+// CPU control signals
+wire        CPUCK;
+wire        CPUENA;
+wire [15:0] cpu_addr;
+wire [7:0]  cpu_din;
+wire [7:0]  cpu_dout;
+wire        cpu_rd_n;
+wire        cpu_wr_n;
+wire        cpu_mreq_n;
+wire        cpu_m1_n;
+wire        cpu_iorq_n;
+wire        cpu_wait_n;
+
+// include Z80 CPU
+T80se T80se (
+	.RESET_n  ( !cpu_reset    ),   // TODO connect to RESET key
+	.CLK_n    ( F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
+	.CLKEN    ( CPUENA        ),   // CPU enable
+	.WAIT_n   ( cpu_wait_n    ),   // TODO connect to wait line
+	.INT_n    ( vsync         ),   // VSYNC interrupt
+	.NMI_n    ( 1'b1          ),   // connected to VCC
+	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
+	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
+	.M1_n     ( cpu_m1_n      ),   // M1==0 && MREQ==0 cpu is fetching, M1==0 && IORQ==0 ack interrupt
+	.IORQ_n   ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
+	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
+	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
+	.A        ( cpu_addr      ),   // 16 bit address bus
+	.DI       ( cpu_din       ),   // 8 bit data bus (input)
+	.DO       ( cpu_dout      )    // 8 bit data bus (output)
+);
+
 //
 // VTL CHIP GA1
 //
@@ -168,7 +228,9 @@ assign VGA_VS = 1;
 
 // The CPU is kept in reset for further 256 cycles after the PLL is generating stable clocks
 // to make sure things like the SDRAM have some time to initialize
+*/
 
+/*
 reg [9:0] cpu_reset_cnt = 0;
 wire cpu_reset = (cpu_reset_cnt != 1023);
 always @(posedge F14M) begin
@@ -178,23 +240,251 @@ always @(posedge F14M) begin
 		if(cpu_reset_cnt != 1023)
 			cpu_reset_cnt <= cpu_reset_cnt + 1;
 end
-			
+*/
+
+/*
+reg [7:0] cpu_reset_cnt = 8'h00;
+wire cpu_reset = (cpu_reset_cnt != 255);
+always @(posedge cpu_clock) begin
+	if(!pll_locked)
+		cpu_reset_cnt <= 8'd0;
+	else 
+		if(cpu_reset_cnt != 255)
+			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
+end
+
+reg [22:0] sdram_addr;
+reg sdram_wr;
+reg sdram_rd;
+wire [7:0] sdram_dout;
+reg [7:0] sdram_din;
+
+//
+// RAM tester
+//
+reg [63:0] long_counter;
+reg LEDStatus;
+
+assign LED = LEDStatus;
+
+always @(posedge ram_clock) begin
+	if(cpu_reset) begin
+		long_counter <= 0;
+	end else begin			
+		long_counter <= long_counter + 1;
+					
+		if(long_counter[23:0] == 0) begin
+			LEDStatus <= 1;
+			sdram_rd <= 0;
+			sdram_wr <= 1;
+			sdram_addr <= 'h3800 | ('h7 << 14) ;
+			sdram_din <= 65;
+		end 
+		if(long_counter[23:0] == 200) begin
+			LEDStatus <= 1;
+			sdram_rd <= 0;
+			sdram_wr <= 1;
+			sdram_addr <= 'h3801 | ('h7 << 14) ;
+			sdram_din <= 66;
+		end 
+		if(long_counter[23:0] == 400) begin
+			LEDStatus <= 1;
+			sdram_rd <= 1;
+			sdram_wr <= 0;
+			sdram_addr <= 'h3801 | ('h7 << 14) ;			
+		end 
+		else if(long_counter[23:0] == 2097152) begin				
+			sdram_rd <= 1;
+			sdram_wr <= 0;
+			sdram_addr <= 'h3800 | ('h7 << 14) ;				
+		end 
+		else if(long_counter[23:0] == 2097152+7) begin
+			if(sdram_dout == 65)	LEDStatus <= 0;
+		end
+	end
+end
+*/
+	
+/*	
 //
 // RAM (SDRAM)
 //
-			
-			
+						
 // SDRAM control signals
 wire ram_clock;
 assign SDRAM_CKE = 1'b1;
 assign SDRAM_CLK = ram_clock;
 
+// derive 4Mhz cpu clock from 32Mhz sdram clock
+assign cpu_clock = clk_div[2];
+reg [2:0] clk_div;
+always @(posedge ram_clock)
+	clk_div <= clk_div + 3'd1;
+*/
+
+/*
 // during ROM download data_io writes the ram. Otherwise the CPU
 wire [7:0]  sdram_din  = dio_download ? dio_data  : cpu_dout;
 wire [24:0] sdram_addr = dio_download ? dio_addr  : paged_address;
 wire        sdram_wr   = dio_download ? dio_write : bank_is_ram;    // TODO ROM write only management
 wire        sdram_cs   = dio_download ? 1'b1 : !cpu_rd_n;
 wire [7:0]  sdram_dout;
+*/
+
+/*
+sdram sdram (
+	// interface to the MT48LC16M16 chip
+   .sd_data        ( SDRAM_DQ                  ),
+   .sd_addr        ( SDRAM_A                   ),
+   .sd_dqm         ( {SDRAM_DQMH, SDRAM_DQML}  ),
+   .sd_cs          ( SDRAM_nCS                 ),
+   .sd_ba          ( SDRAM_BA                  ),
+   .sd_we          ( SDRAM_nWE                 ),
+   .sd_ras         ( SDRAM_nRAS                ),
+   .sd_cas         ( SDRAM_nCAS                ),
+
+   // system interface
+   .clk            ( ram_clock                 ),
+   .clkref         ( cpu_clock                 ),
+   .init           ( !pll_locked               ),
+
+   // cpu interface
+   .din            ( sdram_din                 ),
+   .addr           ( sdram_addr                ),
+   .we             ( sdram_wr                  ),
+   .oe         	 ( sdram_rd                  ),
+   .dout           ( sdram_dout                )
+);
+*/
+	
+//
+// clocks
+//
+
+/*
+wire pll_locked;
+
+pll pll (
+	 .inclk0 ( CLOCK_27[0]   ),
+	 .locked ( pll_locked    ),        // PLL is running stable
+	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
+	 .c1     ( ram_clock     )         // F14M x 4 	 
+);
+
+endmodule
+*/
+/*
+endmodule
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// A simple system-on-a-chip (SoC) for the MiST
+// (c) 2015 Till Harbaum
+									  
+module laser500_mist (
+   input [1:0] 	CLOCK_27,
+	
+	// SDRAM interface
+	inout [15:0]  	SDRAM_DQ, 		// SDRAM Data bus 16 Bits
+	output [12:0] 	SDRAM_A, 		// SDRAM Address bus 13 Bits
+	output        	SDRAM_DQML, 	// SDRAM Low-byte Data Mask
+	output        	SDRAM_DQMH, 	// SDRAM High-byte Data Mask
+	output        	SDRAM_nWE, 		// SDRAM Write Enable
+	output       	SDRAM_nCAS, 	// SDRAM Column Address Strobe
+	output        	SDRAM_nRAS, 	// SDRAM Row Address Strobe
+	output        	SDRAM_nCS, 		// SDRAM Chip Select
+	output [1:0]  	SDRAM_BA, 		// SDRAM Bank Address
+	output 			SDRAM_CLK, 		// SDRAM Clock
+	output        	SDRAM_CKE, 		// SDRAM Clock Enable
+
+	
+	// VGA interface
+   output 			VGA_HS,
+   output 	 		VGA_VS,
+   output [5:0] 	VGA_R,
+   output [5:0] 	VGA_G,
+   output [5:0] 	VGA_B,
+	
+	output LED
+);
+
+wire pixel_clock;
+
+/*
+// include VGA controller
+vga vga (
+	.pclk     ( pixel_clock      ),	 
+
+	.hs    (VGA_HS),
+	.vs    (VGA_VS),
+	.r     (VGA_R),
+	.g     (VGA_G),
+	.b     (VGA_B)
+);
+*/
+
+// ****************************
+
+// The CPU is kept in reset for further 256 cyckes after the PLL is
+// generating stable clocks to make sure things like the SDRAM have
+// some time to initialize
+reg [7:0] cpu_reset_cnt = 8'h00;
+wire cpu_reset = (cpu_reset_cnt != 255);
+always @(posedge cpu_clock) begin
+	if(!pll_locked)
+		cpu_reset_cnt <= 8'd0;
+	else 
+		if(cpu_reset_cnt != 255)
+			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
+end
+			
+// SDRAM control signals
+wire ram_clock;
+assign SDRAM_CKE = 1'b1;
+assign SDRAM_CLK = ram_clock;
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip
@@ -209,91 +499,80 @@ sdram sdram (
 
    // system interface
    .clk            ( ram_clock                 ),
-   .clkref         ( F14M                      ),
+   .clkref         ( cpu_clock                 ),
    .init           ( !pll_locked               ),
 
-   // cpu interface
+   // cpu/chipset interface
    .din            ( sdram_din                 ),
    .addr           ( sdram_addr                ),
    .we             ( sdram_wr                  ),
-   .oe         	 ( sdram_cs                  ),
+   .oe         	 ( sdram_rd                  ),
    .dout           ( sdram_dout                )
 );
 	
-//
-// Z80 CPU
-//
+reg [22:0] sdram_addr;
+reg sdram_wr;
+reg sdram_rd;
+wire [7:0] sdram_dout;
+reg [7:0] sdram_din;
 	
-// CPU control signals
-wire        CPUCK;
-wire        CPUENA;
-wire [15:0] cpu_addr;
-wire [7:0]  cpu_din;
-wire [7:0]  cpu_dout;
-wire        cpu_rd_n;
-wire        cpu_wr_n;
-wire        cpu_mreq_n;
-wire        cpu_m1_n;
-wire        cpu_iorq_n;
-wire        cpu_wait_n;
-
-// include Z80 CPU
-T80se T80se (
-	.RESET_n  ( !cpu_reset    ),   // TODO connect to RESET key
-	.CLK_n    ( F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
-	.CLKEN    ( CPUENA        ),   // CPU enable
-	.WAIT_n   ( cpu_wait_n    ),   // TODO connect to wait line
-	.INT_n    ( vsync         ),   // VSYNC interrupt
-	.NMI_n    ( 1'b1          ),   // connected to VCC
-	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
-	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
-	.M1_n     ( cpu_m1_n      ),   // M1==0 && MREQ==0 cpu is fetching, M1==0 && IORQ==0 ack interrupt
-	.IORQ_n   ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
-	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
-	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
-	.A        ( cpu_addr      ),   // 16 bit address bus
-	.DI       ( cpu_din       ),   // 8 bit data bus (input)
-	.DO       ( cpu_dout      )    // 8 bit data bus (output)
-);
-
-assign cpu_din = sdram_dout;
-
 //
-// data_io
+// RAM tester
 //
+reg [63:0] long_counter;
+reg LEDStatus;
+assign LED = LEDStatus;
 
-wire        dio_download;
-wire [24:0] dio_addr;
-wire [7:0]  dio_data;
-wire        dio_write;
+always @(posedge ram_clock) begin
+	if(cpu_reset) begin
+		long_counter <= 0;
+	end else begin			
+		long_counter <= long_counter + 1;
+					
+		if(long_counter[23:0] == 0) begin
+			LEDStatus <= 1;
+			sdram_rd <= 0;
+			sdram_wr <= 1;
+			sdram_addr <= 'h3800 | ('h7 << 14) ;
+			sdram_din <= 65;
+		end 
+		if(long_counter[23:0] == 200) begin
+			LEDStatus <= 1;
+			sdram_rd <= 0;
+			sdram_wr <= 1;
+			sdram_addr <= 'h3801 | ('h7 << 14) ;
+			sdram_din <= 66;
+		end 
+		if(long_counter[23:0] == 400) begin
+			LEDStatus <= 1;
+			sdram_rd <= 1;
+			sdram_wr <= 0;
+			sdram_addr <= 'h3801 | ('h7 << 14) ;			
+		end 
+		else if(long_counter[23:0] == 2097152) begin				
+			sdram_rd <= 1;
+			sdram_wr <= 0;
+			sdram_addr <= 'h3800 | ('h7 << 14) ;				
+		end 
+		else if(long_counter[23:0] == 2097152+7) begin
+			if(sdram_dout == 65)	LEDStatus <= 0;
+		end
+	end
+end
 
-// include ROM download helper
-data_io data_io (
-	// io controller spi interface
-   .sck	( SPI_SCK ),
-   .ss	( SPI_SS2 ),
-   .sdi	( SPI_DI  ),
 
-	.downloading ( dio_download ),  // signal indicating an active rom download
-	         
-   // external ram interface
-   .clk   ( F14M      ),
-   .wr    ( dio_write ),
-   .addr  ( dio_addr  ),
-   .data  ( dio_data  )
-);
-
-//
-// clocks
-//
-
+// derive 4Mhz cpu clock from 32Mhz sdram clock
+assign cpu_clock = clk_div[2];
+reg [2:0] clk_div;
+always @(posedge ram_clock)
+	clk_div <= clk_div + 3'd1;
+	
 wire pll_locked;
-
 pll pll (
 	 .inclk0 ( CLOCK_27[0]   ),
 	 .locked ( pll_locked    ),        // PLL is running stable
-	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
-	 .c1     ( ram_clock     )         // F14M x 4 	 
+	 .c0     ( pixel_clock   ),        // 25.175 MHz
+	 .c1     ( ram_clock     ),        // 32 MHz
 );
 
 endmodule

@@ -155,10 +155,6 @@ set_global_assignment -name FITTER_EFFORT "FAST FIT"
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_*
-set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_*
-set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ*
-set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ*
 set_global_assignment -name SYSTEMVERILOG_FILE laser500_mist.sv
 set_global_assignment -name VERILOG_FILE VTL_chip.v
 set_global_assignment -name VERILOG_FILE rom_charset.v
