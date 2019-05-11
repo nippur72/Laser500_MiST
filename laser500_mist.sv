@@ -296,7 +296,7 @@ always @(posedge F14M) begin
 			sdram_wr <= 0;
 			sdram_addr <= 'h3800 | ('h7 << 14) ;				
 		end 
-		else if(long_counter[23:0] == 2097152+2) begin  
+		else if(long_counter[23:0] == 2097152+3) begin  
 			if(sdram_dout == 65)	LEDStatus <= 0;
 		end
 	end
