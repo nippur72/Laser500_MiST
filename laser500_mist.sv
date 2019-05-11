@@ -47,7 +47,7 @@ module laser500_mist
 
 // menu configuration string passed to user_io
 localparam CONF_STR = {
-	"Laser500;;",
+	"LASER500;;", // must be UPPERCASE        
 	"O1,Scanlines,On,Off;",
 	"T2,Reset"
 };
@@ -144,7 +144,7 @@ data_io data_io (
 	.downloading ( dio_download ),  // signal indicating an active rom download
 	         
    // external ram interface
-   .clk   ( F14M      ),
+   .clk   ( F3M       ),
    .wr    ( dio_write ),
    .addr  ( dio_addr  ),
    .data  ( dio_data  )
@@ -189,7 +189,8 @@ T80se T80se (
 //
 // VTL CHIP GA1
 //
-								  
+					
+wire       F3M;					
 wire       F14M;
 wire [5:0] video_r;
 wire [5:0] video_g; 
@@ -219,7 +220,10 @@ VTL_chip VTL_chip
 	.vsync  ( video_vs    ),
 	.r      ( video_r     ),
 	.g      ( video_g     ),
-	.b      ( video_b     )
+	.b      ( video_b     ),
+	
+	// other inputs
+	.blank  ( dio_download )
 );
 
 // TODO add scandoubler
@@ -261,11 +265,18 @@ reg  [7:0] test_din;
 // RAM tester
 //
 reg [63:0] long_counter;
-reg LEDStatus;
+reg LEDStatus = 0;
 
 assign LED = LEDStatus;
 
-always @(posedge F14M) begin
+/*
+always @(posedge F3M) begin
+	LEDStatus <= 1;
+	if(dio_download == 1 && LEDStatus == 1) LEDStatus <= 0;
+end
+*/
+
+always @(posedge F3M) begin
 	if(cpu_reset) begin
 		long_counter <= 0;
 	end else begin			
@@ -294,10 +305,10 @@ always @(posedge F14M) begin
 		else if(long_counter[23:0] == 2097152) begin				
 			test_rd <= 1;
 			test_wr <= 0;
-			test_addr <= 'h3800 | ('h7 << 14) ;				
+			test_addr <= 0; //'h3800 | ('h7 << 14) ;				
 		end 
 		else if(long_counter[23:0] == 2097152+4) begin  
-			if(test_dout == 65)	LEDStatus <= 0;
+			if(test_dout == 'hf3 /*65*/)	LEDStatus <= 0;
 		end
 	end
 end
@@ -320,10 +331,11 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
-assign sdram_addr = test_addr;
-assign sdram_wr   = test_wr;
-assign sdram_rd   = test_rd;
-assign sdram_din  = test_din;
+
+assign sdram_din  = dio_download ? dio_data  : test_din;
+assign sdram_addr = dio_download ? dio_addr  : test_addr;
+assign sdram_wr   = dio_download ? dio_write : test_wr;
+assign sdram_rd   = dio_download ? 1 : test_rd;
 assign test_dout  = sdram_dout;
 
 /*
@@ -369,7 +381,8 @@ pll pll (
 	 .inclk0 ( CLOCK_27[0]   ),
 	 .locked ( pll_locked    ),        // PLL is running stable
 	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
-	 .c1     ( ram_clock     )         // F14M x 4 	 
+	 .c1     ( ram_clock     ),        // F14M x 4 	 
+	 .c2     ( F3M           )         // F14M / 4 	 
 );
 
 endmodule

@@ -30,7 +30,10 @@ module VTL_chip
 	output vsync,
 	output [5:0] r,
 	output [5:0] g,
-	output [5:0] b
+	output [5:0] b,
+	
+	// other ports
+	input blank
 );
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
@@ -297,7 +300,9 @@ always@(posedge F14M) begin
 	
 		// draw pixel at hcnt,vcnt
 		if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
-			pixel <= 0;  // blanking zone         
+			pixel <= 0;   // blanking zone         
+		else if(blank == 1) 
+			pixel <= 'hC; // forced blank 	
 		else if( (vcnt < TOP_BORDER_WIDTH || vcnt >= TOP_BORDER_WIDTH + HEIGHT) || 
 					(hcnt < hsw+hbp + LEFT_BORDER_WIDTH || hcnt >= hsw+hbp + LEFT_BORDER_WIDTH + WIDTH)) 
 			pixel <= vdc_border_color; 
