@@ -345,22 +345,11 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
-
 assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
 assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
 assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
 assign sdram_rd   = dio_download ? 1         : vdc_sdram_rd;
 
-//assign test_dout  = sdram_dout;
-
-/*
-// during ROM download data_io writes the ram. Otherwise the CPU
-wire [7:0]  sdram_din  = dio_download ? dio_data  : cpu_dout;
-wire [24:0] sdram_addr = dio_download ? dio_addr  : paged_address;
-wire        sdram_wr   = dio_download ? dio_write : bank_is_ram;    // TODO ROM write only management
-wire        sdram_cs   = dio_download ? 1'b1 : !cpu_rd_n;
-wire [7:0]  sdram_dout;
-*/
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip

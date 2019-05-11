@@ -185,8 +185,7 @@ always@(posedge F14M) begin
 	
 	   // clock divider and time slot
 		clk_div <= clk_div + 1;
-		
-		/*
+			
 		// wait states handler
 		if(clk_div == 3 && MREQ_n == 0) begin
 			// put CPU in wait state and start a read/write data for CPU
@@ -206,18 +205,8 @@ always@(posedge F14M) begin
 				cassette_bit_out_l       <= DO[1];
 				speaker_A                <= DO[0];
 			end
-		end
-		*/
-		
-		/*
-		// turn off RAM
-		if(clk_div == 6 || clk_div == 2) begin
-			sdram_rd <= 0;
-			sdram_wr <= 0;
-		end
-		*/
-		
-		/*
+		end		
+							
 		if(clk_div == 7 && WAIT_n == 0 && MREQ_n == 0) begin
 			// release CPU from wait state and present the data
 			WAIT_n <= 1;			
@@ -225,10 +214,8 @@ always@(posedge F14M) begin
 				if(base_addr >= 14'h2800 && base_addr <= 14'h2FFF) DI <= { cassette_bit_in, KD }; // memory mapped_io	  
 				else                                               DI <= sdram_dout;              // normal RAM/ROM
 			end			
-		end	
-		*/
-
-		/*
+		end		
+		
 		// Z80 IO ports
 		if(IORQ_n == 0) begin
 			if(RD_n == 0) begin
@@ -250,7 +237,7 @@ always@(posedge F14M) begin
 					case 0x13:
 					case 0x14:
 						return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   
-					* /
+					*/
 			end
 			if(WR_n == 0) begin
 				case(A[7:0])
@@ -289,7 +276,6 @@ always@(posedge F14M) begin
 				endcase				
 			end
 		end
-		*/
    				
 		// counters
 		if(hcnt == hsw+hbp+H+hfp-1) 
@@ -306,6 +292,7 @@ always@(posedge F14M) begin
 		end
 		else hcnt <= hcnt + 10'd1;
       
+		/*
 		// test		
 		if(xcnt[3:0] == 14) begin
 			ramQ <= (xcnt >> 4) + 35 + (ycnt >> 3);
@@ -313,7 +300,7 @@ always@(posedge F14M) begin
 		else if(xcnt[3:0] == 6) begin
 			ramQ <= 8'hf1;
 		end   		
-		
+		*/
 	
 		// draw pixel at hcnt,vcnt
 		if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
@@ -393,9 +380,7 @@ always@(posedge F14M) begin
 			//ramData <= ramQ;			
 			//charsetAddress <= (ramQ << 3) | ycnt[2:0]; // TODO eng/ger/fra
 			ramData <= sdram_dout;			
-			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra			
-			sdram_rd <= 0;
-			sdram_wr <= 0;
+			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra						
 		end
 
 		// T=7 calculate RAM address of character/byte and start reading video RAM
@@ -589,9 +574,7 @@ assign b =
 	wire [25:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
 	wire [25:0] cpuReadAddress = { 7'd0, banks[bank], base_addr };
 	
-	// assign sdram_addr = (CV==1) ? videoAddress : cpuReadAddress;	
-
-	assign sdram_addr = videoAddress;	
+	assign sdram_addr = (CV==1) ? videoAddress : cpuReadAddress;	
 	
 endmodule
 
