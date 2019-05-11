@@ -251,11 +251,11 @@ always @(posedge F14M) begin
 			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
 end
 
-reg [22:0] sdram_addr;
-reg sdram_wr;
-reg sdram_rd;
-wire [7:0] sdram_dout;
-reg [7:0] sdram_din;
+reg [24:0] test_addr;
+reg        test_wr;
+reg        test_rd;
+wire [7:0] test_dout;
+reg  [7:0] test_din;
 
 //
 // RAM tester
@@ -273,31 +273,31 @@ always @(posedge F14M) begin
 					
 		if(long_counter[23:0] == 0) begin
 			LEDStatus <= 1;
-			sdram_rd <= 0;
-			sdram_wr <= 1;
-			sdram_addr <= 'h3800 | ('h7 << 14) ;
-			sdram_din <= 65;
+			test_rd <= 0;
+			test_wr <= 1;
+			test_addr <= 'h3800 | ('h7 << 14) ;
+			test_din <= 65;
 		end 
 		if(long_counter[23:0] == 200) begin
 			LEDStatus <= 1;
-			sdram_rd <= 0;
-			sdram_wr <= 1;
-			sdram_addr <= 'h3801 | ('h7 << 14) ;
-			sdram_din <= 66;
+			test_rd <= 0;
+			test_wr <= 1;
+			test_addr <= 'h3801 | ('h7 << 14) ;
+			test_din <= 66;
 		end 
 		if(long_counter[23:0] == 400) begin
 			LEDStatus <= 1;
-			sdram_rd <= 1;
-			sdram_wr <= 0;
-			sdram_addr <= 'h3801 | ('h7 << 14) ;			
+			test_rd <= 1;
+			test_wr <= 0;
+			test_addr <= 'h3801 | ('h7 << 14) ;			
 		end 
 		else if(long_counter[23:0] == 2097152) begin				
-			sdram_rd <= 1;
-			sdram_wr <= 0;
-			sdram_addr <= 'h3800 | ('h7 << 14) ;				
+			test_rd <= 1;
+			test_wr <= 0;
+			test_addr <= 'h3800 | ('h7 << 14) ;				
 		end 
-		else if(long_counter[23:0] == 2097152+3) begin  
-			if(sdram_dout == 65)	LEDStatus <= 0;
+		else if(long_counter[23:0] == 2097152+4) begin  
+			if(test_dout == 65)	LEDStatus <= 0;
 		end
 	end
 end
@@ -313,6 +313,18 @@ wire ram_clock;
 assign SDRAM_CKE = 1'b1;
 assign SDRAM_CLK = ram_clock;
 
+
+wire [24:0] sdram_addr ;
+wire        sdram_wr   ;
+wire        sdram_rd   ;
+wire [7:0]  sdram_dout ; 
+wire [7:0]  sdram_din  ; 
+
+assign sdram_addr = test_addr;
+assign sdram_wr   = test_wr;
+assign sdram_rd   = test_rd;
+assign sdram_din  = test_din;
+assign test_dout  = sdram_dout;
 
 /*
 // during ROM download data_io writes the ram. Otherwise the CPU
@@ -339,12 +351,12 @@ sdram sdram (
    .clkref         ( F14M                      ),
    .init           ( !pll_locked               ),
 
-   // cpu interface
+   // cpu interface	
    .din            ( sdram_din                 ),
    .addr           ( sdram_addr                ),
    .we             ( sdram_wr                  ),
    .oe         	 ( sdram_rd                  ),
-   .dout           ( sdram_dout                )
+   .dout           ( sdram_dout                )	
 );
 	
 //
