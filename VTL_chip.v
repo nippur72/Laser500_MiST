@@ -38,8 +38,8 @@ parameter hsw = 66;         // hsync width
 parameter hbp = 78;         // horizontal back porch, unused time after hsync
 
 parameter HEIGHT              = 192;  // height of active area  
-parameter TOP_BORDER_WIDTH    =  72;  // top border
-parameter BOTTOM_BORDER_WIDTH =  48;  // bottom
+parameter TOP_BORDER_WIDTH    =  64;  // top border
+parameter BOTTOM_BORDER_WIDTH =  56;  // bottom
 parameter V                   = 312;  // number of lines
 
 parameter WIDTH               = 640;  // width of active area  
@@ -370,7 +370,8 @@ always@(posedge F14M) begin
 		if(xcnt[2:0] == 3) begin
 			ramData <= ramQ; // sdram_dout;
 			sdram_cs <= 0;
-			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra
+			//charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra
+			charsetAddress <= (ramQ << 3) | ycnt[2:0]; // TODO eng/ger/fra
 		end
 
 		// T=7 calculate RAM address of character/byte and start reading video RAM
