@@ -4,7 +4,7 @@
 //
 // Derived from source code by Till Harbaum (c) 2015
 //
-/*									  
+									  
 module laser500_mist 
 ( 
    input [1:0] 	CLOCK_27,      // 27 MHz board clock 
@@ -228,7 +228,6 @@ assign VGA_VS = 1;
 
 // The CPU is kept in reset for further 256 cycles after the PLL is generating stable clocks
 // to make sure things like the SDRAM have some time to initialize
-*/
 
 /*
 reg [9:0] cpu_reset_cnt = 0;
@@ -242,7 +241,6 @@ always @(posedge F14M) begin
 end
 */
 
-/*
 reg [7:0] cpu_reset_cnt = 8'h00;
 wire cpu_reset = (cpu_reset_cnt != 255);
 always @(posedge cpu_clock) begin
@@ -303,9 +301,9 @@ always @(posedge ram_clock) begin
 		end
 	end
 end
-*/
+
 	
-/*	
+	
 //
 // RAM (SDRAM)
 //
@@ -320,7 +318,7 @@ assign cpu_clock = clk_div[2];
 reg [2:0] clk_div;
 always @(posedge ram_clock)
 	clk_div <= clk_div + 3'd1;
-*/
+
 
 /*
 // during ROM download data_io writes the ram. Otherwise the CPU
@@ -331,7 +329,6 @@ wire        sdram_cs   = dio_download ? 1'b1 : !cpu_rd_n;
 wire [7:0]  sdram_dout;
 */
 
-/*
 sdram sdram (
 	// interface to the MT48LC16M16 chip
    .sd_data        ( SDRAM_DQ                  ),
@@ -355,13 +352,11 @@ sdram sdram (
    .oe         	 ( sdram_rd                  ),
    .dout           ( sdram_dout                )
 );
-*/
 	
 //
 // clocks
 //
 
-/*
 wire pll_locked;
 
 pll pll (
@@ -369,210 +364,6 @@ pll pll (
 	 .locked ( pll_locked    ),        // PLL is running stable
 	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
 	 .c1     ( ram_clock     )         // F14M x 4 	 
-);
-
-endmodule
-*/
-/*
-endmodule
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// A simple system-on-a-chip (SoC) for the MiST
-// (c) 2015 Till Harbaum
-									  
-module laser500_mist (
-   input [1:0] 	CLOCK_27,
-	
-	// SDRAM interface
-	inout [15:0]  	SDRAM_DQ, 		// SDRAM Data bus 16 Bits
-	output [12:0] 	SDRAM_A, 		// SDRAM Address bus 13 Bits
-	output        	SDRAM_DQML, 	// SDRAM Low-byte Data Mask
-	output        	SDRAM_DQMH, 	// SDRAM High-byte Data Mask
-	output        	SDRAM_nWE, 		// SDRAM Write Enable
-	output       	SDRAM_nCAS, 	// SDRAM Column Address Strobe
-	output        	SDRAM_nRAS, 	// SDRAM Row Address Strobe
-	output        	SDRAM_nCS, 		// SDRAM Chip Select
-	output [1:0]  	SDRAM_BA, 		// SDRAM Bank Address
-	output 			SDRAM_CLK, 		// SDRAM Clock
-	output        	SDRAM_CKE, 		// SDRAM Clock Enable
-
-	
-	// VGA interface
-   output 			VGA_HS,
-   output 	 		VGA_VS,
-   output [5:0] 	VGA_R,
-   output [5:0] 	VGA_G,
-   output [5:0] 	VGA_B,
-	
-	output LED
-);
-
-wire pixel_clock;
-
-/*
-// include VGA controller
-vga vga (
-	.pclk     ( pixel_clock      ),	 
-
-	.hs    (VGA_HS),
-	.vs    (VGA_VS),
-	.r     (VGA_R),
-	.g     (VGA_G),
-	.b     (VGA_B)
-);
-*/
-
-// ****************************
-
-// The CPU is kept in reset for further 256 cyckes after the PLL is
-// generating stable clocks to make sure things like the SDRAM have
-// some time to initialize
-reg [7:0] cpu_reset_cnt = 8'h00;
-wire cpu_reset = (cpu_reset_cnt != 255);
-always @(posedge cpu_clock) begin
-	if(!pll_locked)
-		cpu_reset_cnt <= 8'd0;
-	else 
-		if(cpu_reset_cnt != 255)
-			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
-end
-			
-// SDRAM control signals
-wire ram_clock;
-assign SDRAM_CKE = 1'b1;
-assign SDRAM_CLK = ram_clock;
-
-sdram sdram (
-	// interface to the MT48LC16M16 chip
-   .sd_data        ( SDRAM_DQ                  ),
-   .sd_addr        ( SDRAM_A                   ),
-   .sd_dqm         ( {SDRAM_DQMH, SDRAM_DQML}  ),
-   .sd_cs          ( SDRAM_nCS                 ),
-   .sd_ba          ( SDRAM_BA                  ),
-   .sd_we          ( SDRAM_nWE                 ),
-   .sd_ras         ( SDRAM_nRAS                ),
-   .sd_cas         ( SDRAM_nCAS                ),
-
-   // system interface
-   .clk            ( ram_clock                 ),
-   .clkref         ( cpu_clock                 ),
-   .init           ( !pll_locked               ),
-
-   // cpu/chipset interface
-   .din            ( sdram_din                 ),
-   .addr           ( sdram_addr                ),
-   .we             ( sdram_wr                  ),
-   .oe         	 ( sdram_rd                  ),
-   .dout           ( sdram_dout                )
-);
-	
-reg [22:0] sdram_addr;
-reg sdram_wr;
-reg sdram_rd;
-wire [7:0] sdram_dout;
-reg [7:0] sdram_din;
-	
-//
-// RAM tester
-//
-reg [63:0] long_counter;
-reg LEDStatus;
-assign LED = LEDStatus;
-
-always @(posedge ram_clock) begin
-	if(cpu_reset) begin
-		long_counter <= 0;
-	end else begin			
-		long_counter <= long_counter + 1;
-					
-		if(long_counter[23:0] == 0) begin
-			LEDStatus <= 1;
-			sdram_rd <= 0;
-			sdram_wr <= 1;
-			sdram_addr <= 'h3800 | ('h7 << 14) ;
-			sdram_din <= 65;
-		end 
-		if(long_counter[23:0] == 200) begin
-			LEDStatus <= 1;
-			sdram_rd <= 0;
-			sdram_wr <= 1;
-			sdram_addr <= 'h3801 | ('h7 << 14) ;
-			sdram_din <= 66;
-		end 
-		if(long_counter[23:0] == 400) begin
-			LEDStatus <= 1;
-			sdram_rd <= 1;
-			sdram_wr <= 0;
-			sdram_addr <= 'h3801 | ('h7 << 14) ;			
-		end 
-		else if(long_counter[23:0] == 2097152) begin				
-			sdram_rd <= 1;
-			sdram_wr <= 0;
-			sdram_addr <= 'h3800 | ('h7 << 14) ;				
-		end 
-		else if(long_counter[23:0] == 2097152+7) begin
-			if(sdram_dout == 65)	LEDStatus <= 0;
-		end
-	end
-end
-
-
-// derive 4Mhz cpu clock from 32Mhz sdram clock
-assign cpu_clock = clk_div[2];
-reg [2:0] clk_div;
-always @(posedge ram_clock)
-	clk_div <= clk_div + 3'd1;
-	
-wire pll_locked;
-pll pll (
-	 .inclk0 ( CLOCK_27[0]   ),
-	 .locked ( pll_locked    ),        // PLL is running stable
-	 .c0     ( pixel_clock   ),        // 25.175 MHz
-	 .c1     ( ram_clock     ),        // 32 MHz
 );
 
 endmodule
