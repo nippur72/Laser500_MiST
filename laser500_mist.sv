@@ -243,7 +243,7 @@ end
 
 reg [7:0] cpu_reset_cnt = 8'h00;
 wire cpu_reset = (cpu_reset_cnt != 255);
-always @(posedge cpu_clock) begin
+always @(posedge F14M) begin
 	if(!pll_locked)
 		cpu_reset_cnt <= 8'd0;
 	else 
@@ -296,7 +296,7 @@ always @(posedge ram_clock) begin
 			sdram_wr <= 0;
 			sdram_addr <= 'h3800 | ('h7 << 14) ;				
 		end 
-		else if(long_counter[23:0] == 2097152+7) begin
+		else if(long_counter[23:0] == 2097152+8*4-1) begin
 			if(sdram_dout == 65)	LEDStatus <= 0;
 		end
 	end
@@ -312,12 +312,6 @@ end
 wire ram_clock;
 assign SDRAM_CKE = 1'b1;
 assign SDRAM_CLK = ram_clock;
-
-// derive 4Mhz cpu clock from 32Mhz sdram clock
-assign cpu_clock = clk_div[2];
-reg [2:0] clk_div;
-always @(posedge ram_clock)
-	clk_div <= clk_div + 3'd1;
 
 
 /*
@@ -342,7 +336,7 @@ sdram sdram (
 
    // system interface
    .clk            ( ram_clock                 ),
-   .clkref         ( cpu_clock                 ),
+   .clkref         ( F14M                      ),
    .init           ( !pll_locked               ),
 
    // cpu interface
