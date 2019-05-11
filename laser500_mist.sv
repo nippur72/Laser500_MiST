@@ -197,6 +197,11 @@ wire [5:0] video_g;
 wire [5:0] video_b;
 wire       video_hs;
 wire       video_vs;
+
+wire [24:0] vdc_sdram_addr;
+wire        vdc_sdram_wr;
+wire        vdc_sdram_rd;
+wire  [7:0] vdc_sdram_din;
 		  
 // VTL custom chip
 VTL_chip VTL_chip 
@@ -223,7 +228,14 @@ VTL_chip VTL_chip
 	.b      ( video_b     ),
 	
 	// other inputs
-	.blank  ( dio_download )
+	.blank  ( dio_download ),
+
+	//	SDRAM interface
+	.sdram_addr   ( vdc_sdram_addr   ), 
+	.sdram_din    ( vdc_sdram_din    ),
+	.sdram_rd     ( vdc_sdram_rd     ),
+	.sdram_wr     ( vdc_sdram_wr     ),
+	.sdram_dout   ( sdram_dout )
 );
 
 // TODO add scandoubler
@@ -255,11 +267,6 @@ always @(posedge F14M) begin
 			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
 end
 
-reg [24:0] test_addr;
-reg        test_wr;
-reg        test_rd;
-wire [7:0] test_dout;
-reg  [7:0] test_din;
 
 //
 // RAM tester
@@ -275,6 +282,13 @@ always @(posedge F3M) begin
 	if(dio_download == 1 && LEDStatus == 1) LEDStatus <= 0;
 end
 */
+
+/*
+reg [24:0] test_addr;
+reg        test_wr;
+reg        test_rd;
+wire [7:0] test_dout;
+reg  [7:0] test_din;
 
 always @(posedge F3M) begin
 	if(cpu_reset) begin
@@ -308,11 +322,11 @@ always @(posedge F3M) begin
 			test_addr <= 0; //'h3800 | ('h7 << 14) ;				
 		end 
 		else if(long_counter[23:0] == 2097152+4) begin  
-			if(test_dout == 'hf3 /*65*/)	LEDStatus <= 0;
+			if(test_dout == 'hf3)	LEDStatus <= 0;   // 65
 		end
 	end
 end
-
+*/
 	
 	
 //
@@ -332,11 +346,12 @@ wire [7:0]  sdram_dout ;
 wire [7:0]  sdram_din  ; 
 
 
-assign sdram_din  = dio_download ? dio_data  : test_din;
-assign sdram_addr = dio_download ? dio_addr  : test_addr;
-assign sdram_wr   = dio_download ? dio_write : test_wr;
-assign sdram_rd   = dio_download ? 1 : test_rd;
-assign test_dout  = sdram_dout;
+assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
+assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
+assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
+assign sdram_rd   = dio_download ? 1         : vdc_sdram_rd;
+
+//assign test_dout  = sdram_dout;
 
 /*
 // during ROM download data_io writes the ram. Otherwise the CPU

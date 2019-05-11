@@ -22,8 +22,8 @@ module VTL_chip
 	output    [24:0] sdram_addr, // sdram address  
 	input      [7:0] sdram_dout, // sdram data ouput
    output reg [7:0] sdram_din,  // sdram data input
-	output           sdram_wr,   // sdram write
-	output reg       sdram_cs,   // sdram chip select	
+	output reg       sdram_wr,   // sdram write
+	output reg       sdram_rd,   // sdram read	
 	
 	// output to CRT screen
 	output hsync,
@@ -178,19 +178,23 @@ always@(posedge F14M) begin
 		banks[2] <= 0;
 		banks[3] <= 0;
 		WAIT_n <= 1;
-		sdram_cs <= 0;
+		sdram_rd <= 0;
+		sdram_wr <= 0;
 	end
 	else begin	
 	
 	   // clock divider and time slot
 		clk_div <= clk_div + 1;
 		
+		/*
 		// wait states handler
 		if(clk_div == 3 && MREQ_n == 0) begin
 			// put CPU in wait state and start a read/write data for CPU
 			WAIT_n <= 0;			
-			sdram_cs <= 1;
-			if(~WR_n) sdram_din <= DO;			
+			sdram_rd <= ~RD_n;
+			sdram_wr <= ~WR_n & bank_is_ram;
+			sdram_din <= DO;  		
+			
 			// write also into mapped I/O
 			if(base_addr >= 14'h2800 && base_addr <= 14'h2FFF) begin
 				io_bit_7                 <= DO[7];
@@ -203,16 +207,28 @@ always@(posedge F14M) begin
 				speaker_A                <= DO[0];
 			end
 		end
+		*/
+		
+		/*
+		// turn off RAM
+		if(clk_div == 6 || clk_div == 2) begin
+			sdram_rd <= 0;
+			sdram_wr <= 0;
+		end
+		*/
+		
+		/*
 		if(clk_div == 7 && WAIT_n == 0 && MREQ_n == 0) begin
 			// release CPU from wait state and present the data
 			WAIT_n <= 1;			
 			if(~RD_n) begin
 				if(base_addr >= 14'h2800 && base_addr <= 14'h2FFF) DI <= { cassette_bit_in, KD }; // memory mapped_io	  
 				else                                               DI <= sdram_dout;              // normal RAM/ROM
-			end
-			sdram_cs <= 0;
+			end			
 		end	
+		*/
 
+		/*
 		// Z80 IO ports
 		if(IORQ_n == 0) begin
 			if(RD_n == 0) begin
@@ -234,7 +250,7 @@ always@(posedge F14M) begin
 					case 0x13:
 					case 0x14:
 						return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   
-					*/
+					* /
 			end
 			if(WR_n == 0) begin
 				case(A[7:0])
@@ -273,6 +289,7 @@ always@(posedge F14M) begin
 				endcase				
 			end
 		end
+		*/
    				
 		// counters
 		if(hcnt == hsw+hbp+H+hfp-1) 
@@ -373,10 +390,12 @@ always@(posedge F14M) begin
 
 		// T=3 read character from RAM and stores into latch "ramData", starts ROM reading   
 		if(xcnt[2:0] == 3) begin
-			ramData <= ramQ; // sdram_dout;
-			sdram_cs <= 0;
-			//charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra
-			charsetAddress <= (ramQ << 3) | ycnt[2:0]; // TODO eng/ger/fra
+			//ramData <= ramQ;			
+			//charsetAddress <= (ramQ << 3) | ycnt[2:0]; // TODO eng/ger/fra
+			ramData <= sdram_dout;			
+			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra			
+			sdram_rd <= 0;
+			sdram_wr <= 0;
 		end
 
 		// T=7 calculate RAM address of character/byte and start reading video RAM
@@ -444,7 +463,8 @@ always@(posedge F14M) begin
 			else begin
 				ramAddress <= ramAddress + 1;  
 			end 
-			sdram_cs <= 1;			
+			sdram_rd <= 1;			
+			sdram_wr <= 0;			
 		end
 
 		// T=7 move saved latch to the pixel register 
@@ -569,8 +589,9 @@ assign b =
 	wire [25:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
 	wire [25:0] cpuReadAddress = { 7'd0, banks[bank], base_addr };
 	
-	assign sdram_address = (CV==1) ? videoAddress : cpuReadAddress;	
-	assign sdram_wr      = (CV==1) ? 0 : (~MREQ_n & ~WR_n) & bank_is_ram;	
+	// assign sdram_addr = (CV==1) ? videoAddress : cpuReadAddress;	
+
+	assign sdram_addr = videoAddress;	
 	
 endmodule
 
