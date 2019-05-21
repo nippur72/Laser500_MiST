@@ -157,23 +157,24 @@ data_io data_io (
 // CPU control signals
 wire        CPUCK;
 wire        CPUENA;
+wire        WAIT_n;
 wire [15:0] cpu_addr;
-wire [7:0]  cpu_din;
+//wire [7:0]  cpu_din;
 wire [7:0]  cpu_dout;
 wire        cpu_rd_n;
 wire        cpu_wr_n;
 wire        cpu_mreq_n;
 wire        cpu_m1_n;
 wire        cpu_iorq_n;
-wire        cpu_wait_n;
+
 
 // include Z80 CPU
 T80se T80se (
-	.RESET_n  ( !cpu_reset    ),   // TODO connect to RESET key
+	.RESET_n  ( cpuStarted /*!cpu_reset*/    ),   // TODO connect to RESET key
 	.CLK_n    ( F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
-	.CLKEN    ( CPUENA        ),   // CPU enable
-	.WAIT_n   ( cpu_wait_n    ),   // TODO connect to wait line
-	.INT_n    ( vsync         ),   // VSYNC interrupt
+	.CLKEN    ( /*CPUENA &*/ cpuStarted ),   // CPU enable
+	.WAIT_n   ( 1'b1 /*WAIT_n */       ),   // WAIT 
+	.INT_n    ( 1'b1 /*video_vs*/      ),   // VSYNC interrupt
 	.NMI_n    ( 1'b1          ),   // connected to VCC
 	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
 	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
@@ -182,7 +183,7 @@ T80se T80se (
 	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
 	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
 	.A        ( cpu_addr      ),   // 16 bit address bus
-	.DI       ( cpu_din       ),   // 8 bit data bus (input)
+	.DI       ( sdram_dout /*cpu_din*/       ),   // 8 bit data bus (input)
 	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
 
@@ -198,7 +199,7 @@ wire [5:0] video_b;
 wire       video_hs;
 wire       video_vs;
 
-wire [24:0] vdc_sdram_addr;
+wire [24:0] vdc_sdram_addr; 
 wire        vdc_sdram_wr;
 wire        vdc_sdram_rd;
 wire  [7:0] vdc_sdram_din;
@@ -208,6 +209,7 @@ VTL_chip VTL_chip
 (	
 	.RESET  ( cpu_reset   ),
 	.F14M   ( F14M        ),
+	.WAIT_n ( WAIT_n      ),
 	
 	// cpu
    .CPUCK    ( CPUCK         ),
@@ -235,7 +237,7 @@ VTL_chip VTL_chip
 	.sdram_din    ( vdc_sdram_din    ),
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
-	.sdram_dout   ( sdram_dout )
+	.sdram_dout   ( /*sdram_dout*/ 0 )
 );
 
 // TODO add scandoubler
@@ -267,12 +269,24 @@ always @(posedge F14M) begin
 			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
 end
 
+reg st_resetD;
+reg cpuStarted = 0;
+
+always @(posedge F14M) begin
+	st_resetD <= st_reset;
+	if(st_reset == 1 && st_resetD == 0) begin
+		cpuStarted <= 1;		
+	end	
+
+	if(cpuStarted && cpu_addr == 'h66C8)
+		LEDStatus <= 0;
+end
 
 //
 // RAM tester
 //
 reg [63:0] long_counter;
-reg LEDStatus = 0;
+reg LEDStatus = 1;
 
 assign LED = LEDStatus;
 
@@ -345,11 +359,19 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
+/*
 assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
 assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
 assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
-assign sdram_rd   = dio_download ? 1         : vdc_sdram_rd;
+assign sdram_rd   = dio_download ? 1'b1      : vdc_sdram_rd;
+*/
 
+assign sdram_din  = dio_download ? dio_data  : cpu_dout;
+assign sdram_addr = dio_download ? dio_addr  : { 9'd0, cpu_addr };
+assign sdram_wr   = dio_download ? dio_write : ~cpu_wr_n;
+assign sdram_rd   = dio_download ? 1'b1      : ~cpu_rd_n;
+
+//wire [7:0] cpu_din = cpuStarted ? sdram_dout : 'bz;
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip

@@ -19,11 +19,11 @@ module VTL_chip
 	output reg [7:0] DI,          // 8 bit data input for cpu
 	
 	// sdram interface
-	output    [24:0] sdram_addr, // sdram address  
-	input      [7:0] sdram_dout, // sdram data ouput
-   output reg [7:0] sdram_din,  // sdram data input
-	output reg       sdram_wr,   // sdram write
-	output reg       sdram_rd,   // sdram read	
+	output     [24:0] sdram_addr, // sdram address  
+	input       [7:0] sdram_dout, // sdram data ouput
+   output reg  [7:0] sdram_din,  // sdram data input
+	output reg        sdram_wr,   // sdram write
+	output reg        sdram_rd,   // sdram read	
 	
 	// output to CRT screen
 	output hsync,
@@ -67,14 +67,15 @@ reg[12:0] charsetAddress; // address in charset ROM to read from
 wire[7:0] charsetQ;       // data ream from charset ROM
 
 reg[7:0]  ramQ;    // test
+reg[24:0] xadd;
 
 reg [3:0] pixel;          // pixel to draw (color index in the palette)
 
 reg [2:0] vdc_graphic_mode_number  = 5;  // graphic mode number 0..5
-reg       vdc_text80_enabled       = 0;  // TEX80 mode, otherwise TEXT40
+reg       vdc_text80_enabled       = 1;  // TEX80 mode, otherwise TEXT40
 reg [3:0] vdc_text80_foreground    = 15; // foreground color for TEXT80 &c.
 reg [3:0] vdc_text80_background    = 1;  // background color for TEXT80 &c.
-reg [3:0] vdc_border_color         = 9;  // border color
+reg [3:0] vdc_border_color         = 10; // border color
 reg       vdc_page_7               = 1;  // 1=video RAM is in page 7 (Laser 500/700), 3 otherwise (Laser 350)
 
 // memory mapped I/O write registers 
@@ -142,9 +143,10 @@ assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number === 5 || vdc_g
 // calculate x offset (TODO replace with hcnt or clk_div?)
 assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
 
-reg [2:0] clk_div;            // clock divider and bus slot assignment
+wire [2:0] clk_div = hcnt[2:0];   // clock divider and bus slot assignment
+
 assign CPUCK  = clk_div[1];   // derive CPUCK by dividing F14M by 4
-assign CPUENA = clk_div == 4; // CPU enabled signal
+assign CPUENA = clk_div == 2; // CPU enabled signal
 wire   CV     = ~clk_div[2];  // CV=1 video owns bus, CV=0 CPU owns bus
 
 /*
@@ -171,8 +173,7 @@ always@(posedge F14M) begin
 	if(RESET) begin
 		hcnt <= 0;
 		vcnt <= 0;
-		pixel <= 0;
-		clk_div <= 0;
+		pixel <= 0;		
 		banks[0] <= 0;
 		banks[1] <= 0;
 		banks[2] <= 0;
@@ -182,16 +183,43 @@ always@(posedge F14M) begin
 		sdram_wr <= 0;
 	end
 	else begin	
-	
-	   // clock divider and time slot
-		clk_div <= clk_div + 1;
 			
+		xadd <= xadd + 1;
+		
+/*		
+		// concurrent CPU
+		if(clk_div == 3 && MREQ_n == 0) begin
+			sdram_rd <= 1; //~(~WR_n & bank_is_ram); //~RD_n;
+			sdram_wr <= ~WR_n & bank_is_ram;
+			sdram_din <= DO;  			
+			// write also into mapped I/O
+			
+			if(mapped_io) begin
+				io_bit_7                 <= DO[7];
+				caps_lock_bit            <= DO[6];
+				speaker_B                <= DO[5];
+				io_bit_4                 <= DO[4];
+				vdc_graphic_mode_enabled <= DO[3];
+				cassette_bit_out         <= DO[2];
+				cassette_bit_out_l       <= DO[1];
+				speaker_A                <= DO[0];
+			end			
+		end
+		if(clk_div == 4 && MREQ_n == 0) begin
+			if(~RD_n) begin
+				if(mapped_io) DI <= { cassette_bit_in, KD }; // memory mapped_io	  
+				else          DI <= sdram_dout;              // normal RAM/ROM
+			end			
+			sdram_wr <= 0;		
+		end
+*/		
+		/*	
 		// wait states handler
 		if(clk_div == 3 && MREQ_n == 0) begin
 			// put CPU in wait state and start a read/write data for CPU
 			WAIT_n <= 0;			
-			sdram_rd <= ~RD_n;
-			sdram_wr <= ~WR_n & bank_is_ram;
+			//sdram_rd <= ~RD_n;
+			//sdram_wr <= ~WR_n & bank_is_ram;
 			sdram_din <= DO;  		
 			
 			// write also into mapped I/O
@@ -207,37 +235,40 @@ always@(posedge F14M) begin
 			end
 		end		
 							
-		if(clk_div == 7 && WAIT_n == 0 && MREQ_n == 0) begin
+		if(clk_div == 5 && WAIT_n == 0 && MREQ_n == 0) begin
 			// release CPU from wait state and present the data
 			WAIT_n <= 1;			
 			if(~RD_n) begin
 				if(base_addr >= 14'h2800 && base_addr <= 14'h2FFF) DI <= { cassette_bit_in, KD }; // memory mapped_io	  
 				else                                               DI <= sdram_dout;              // normal RAM/ROM
 			end			
+			//sdram_rd <= 0;
+			//sdram_wr <= 0;
 		end		
-		
+		*/
+/*				
 		// Z80 IO ports
-		if(IORQ_n == 0) begin
+		if(clk_div == 3 && IORQ_n == 0) begin
 			if(RD_n == 0) begin
 				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
 				// TODO implement I/O read
-					/*
-					switch(port & 0xFF) {
-					case 0x40: return banks[0];
-					case 0x41: return banks[1];
-					case 0x42: return banks[2];
-					case 0x43: return banks[3];
-					case 0x2b: return joy0;  // joystick 8 directions
-					case 0x27: return joy1;  // joystick fire buttons      
-					case 0x00: return printerReady;                  
-					case 0x2e: return 0x00;  // joystick 2 not emulated yet
-					case 0x10:
-					case 0x11:
-					case 0x12:
-					case 0x13:
-					case 0x14:
-						return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   
-					*/
+					//
+					//switch(port & 0xFF) {
+					//case 0x40: return banks[0];
+					//case 0x41: return banks[1];
+					//case 0x42: return banks[2];
+					//case 0x43: return banks[3];
+					//case 0x2b: return joy0;  // joystick 8 directions
+					//case 0x27: return joy1;  // joystick fire buttons      
+					//case 0x00: return printerReady;                  
+					//case 0x2e: return 0x00;  // joystick 2 not emulated yet
+					//case 0x10:
+					//case 0x11:
+					//case 0x12:
+					//case 0x13:
+					//case 0x14:
+					//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   
+					
 			end
 			if(WR_n == 0) begin
 				case(A[7:0])
@@ -250,12 +281,14 @@ always@(posedge F14M) begin
 							vdc_page_7         <= !DO[3];
 							vdc_text80_enabled <= DO[0]; 
 							vdc_border_color   <= DO[7:4];
-							if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              
-							if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
-							if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
-							if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
-							if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
-							if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
+							
+							//if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              
+							//if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
+							//if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
+							//if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
+							//if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
+							//if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
+							
 						end
 					'h45:
 						begin
@@ -275,8 +308,8 @@ always@(posedge F14M) begin
 						//return;     				
 				endcase				
 			end
-		end
-   				
+		end		
+*/   				
 		// counters
 		if(hcnt == hsw+hbp+H+hfp-1) 
 		begin
@@ -376,12 +409,14 @@ always@(posedge F14M) begin
 		end
 
 		// T=3 read character from RAM and stores into latch "ramData", starts ROM reading   
-		if(xcnt[2:0] == 3) begin
+		if(xcnt[2:0] == 0) begin
 			//ramData <= ramQ;			
 			//charsetAddress <= (ramQ << 3) | ycnt[2:0]; // TODO eng/ger/fra
 			ramData <= sdram_dout;			
 			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra						
-		end
+			//sdram_rd <= 0;
+			//sdram_wr <= 0;
+		end		
 
 		// T=7 calculate RAM address of character/byte and start reading video RAM
 		if(xcnt[2:0] == 7) begin 
@@ -418,15 +453,15 @@ always@(posedge F14M) begin
 					end else if(vdc_graphic_mode_number === 0) begin
 						// GR 0            
 						ramAddress[13] <= 1;
-						ramAddress[12] = ycnt[2];
-						ramAddress[11] = ycnt[1];
-						ramAddress[10] = ycnt[5];
-						ramAddress[ 9] = ycnt[4];
-						ramAddress[ 8] = ycnt[3];
-						ramAddress[ 7] = ycnt[7];
-						ramAddress[ 6] = ycnt[6];
-						ramAddress[ 5] = ycnt[7];
-						ramAddress[ 4] = ycnt[6];
+						ramAddress[12] <= ycnt[2];
+						ramAddress[11] <= ycnt[1];
+						ramAddress[10] <= ycnt[5];
+						ramAddress[ 9] <= ycnt[4];
+						ramAddress[ 8] <= ycnt[3];
+						ramAddress[ 7] <= ycnt[7];
+						ramAddress[ 6] <= ycnt[6];
+						ramAddress[ 5] <= ycnt[7];
+						ramAddress[ 4] <= ycnt[6];
 						ramAddress[3:0] <= 0;
 					end
 				end
@@ -447,9 +482,9 @@ always@(posedge F14M) begin
 			end	
 			else begin
 				ramAddress <= ramAddress + 1;  
-			end 
+			end 			
 			sdram_rd <= 1;			
-			sdram_wr <= 0;			
+			sdram_wr <= 0;					
 		end
 
 		// T=7 move saved latch to the pixel register 
@@ -565,16 +600,18 @@ assign b =
 	// ******************************************************************************						 					
 
 	// bank switching
-	reg  [3:0]  banks[3:0];
-	wire        bank          = A[15:14];
-	wire        base_addr     = A[13:0];	
-	wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO mapped_io, TODO 350/700 ram config
-	wire        mapped_io     = bank == 2;
+	reg   [3:0] banks[3:0];
+	wire  [3:0] bank          = banks[bank_sel];
+	wire  [1:0] bank_sel      = A[15:14];
+	wire [13:0] base_addr     = A[13:0];	
+	wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO 350/700 ram config
+	wire        mapped_io     = bank == 2 && (base_addr >= 14'h2800 && base_addr <= 14'h2FFF);
 	
-	wire [25:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
-	wire [25:0] cpuReadAddress = { 7'd0, banks[bank], base_addr };
+	wire [24:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
+	wire [24:0] cpuReadAddress = { 7'd0, banks[bank], base_addr };		
 	
-	assign sdram_addr = (CV==1) ? videoAddress : cpuReadAddress;	
+	assign sdram_addr = (clk_div == 0 || clk_div == 7 || clk_div == 1) ? videoAddress :
+						     (clk_div == 3 || clk_div == 4 || clk_div == 5) ? cpuReadAddress : 0 ;
 	
 endmodule
 
@@ -583,12 +620,12 @@ endmodule
 /*
 TODO
 - keyboard keys / map KA, KD
-- rom loading
 - memory init
 - joystick, printer emulation
 - decode (make sense out of) vdc_graphic_mode_number bits
 - ena signal on the cpu
 - scandoubler / vga resolution?
 - sdram frame buffer?
+- sincronizzare SDRAM con t=3, t=7
 */
 
