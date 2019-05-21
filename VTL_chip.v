@@ -72,9 +72,9 @@ reg[24:0] xadd;
 reg [3:0] pixel;          // pixel to draw (color index in the palette)
 
 reg [2:0] vdc_graphic_mode_number  = 5;  // graphic mode number 0..5
-reg       vdc_text80_enabled       = 1;  // TEX80 mode, otherwise TEXT40
-reg [3:0] vdc_text80_foreground    = 15; // foreground color for TEXT80 &c.
-reg [3:0] vdc_text80_background    = 1;  // background color for TEXT80 &c.
+reg       vdc_text80_enabled       = 0;  // TEX80 mode, otherwise TEXT40
+reg [3:0] vdc_text80_foreground    = 12; // foreground color for TEXT80 &c.
+reg [3:0] vdc_text80_background    = 3;  // background color for TEXT80 &c.
 reg [3:0] vdc_border_color         = 10; // border color
 reg       vdc_page_7               = 1;  // 1=video RAM is in page 7 (Laser 500/700), 3 otherwise (Laser 350)
 
@@ -185,8 +185,7 @@ always@(posedge F14M) begin
 	else begin	
 			
 		xadd <= xadd + 1;
-		
-/*		
+				
 		// concurrent CPU
 		if(clk_div == 3 && MREQ_n == 0) begin
 			sdram_rd <= 1; //~(~WR_n & bank_is_ram); //~RD_n;
@@ -212,7 +211,7 @@ always@(posedge F14M) begin
 			end			
 			sdram_wr <= 0;		
 		end
-*/		
+		
 		/*	
 		// wait states handler
 		if(clk_div == 3 && MREQ_n == 0) begin
@@ -246,7 +245,7 @@ always@(posedge F14M) begin
 			//sdram_wr <= 0;
 		end		
 		*/
-/*				
+				
 		// Z80 IO ports
 		if(clk_div == 3 && IORQ_n == 0) begin
 			if(RD_n == 0) begin
@@ -309,7 +308,7 @@ always@(posedge F14M) begin
 				endcase				
 			end
 		end		
-*/   				
+   				
 		// counters
 		if(hcnt == hsw+hbp+H+hfp-1) 
 		begin

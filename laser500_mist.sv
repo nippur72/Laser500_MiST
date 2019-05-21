@@ -159,7 +159,7 @@ wire        CPUCK;
 wire        CPUENA;
 wire        WAIT_n;
 wire [15:0] cpu_addr;
-//wire [7:0]  cpu_din;
+wire [7:0]  cpu_din;
 wire [7:0]  cpu_dout;
 wire        cpu_rd_n;
 wire        cpu_wr_n;
@@ -172,9 +172,9 @@ wire        cpu_iorq_n;
 T80se T80se (
 	.RESET_n  ( cpuStarted /*!cpu_reset*/    ),   // TODO connect to RESET key
 	.CLK_n    ( F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
-	.CLKEN    ( /*CPUENA &*/ cpuStarted ),   // CPU enable
-	.WAIT_n   ( 1'b1 /*WAIT_n */       ),   // WAIT 
-	.INT_n    ( 1'b1 /*video_vs*/      ),   // VSYNC interrupt
+	.CLKEN    ( CPUENA & cpuStarted ),   // CPU enable
+	.WAIT_n   ( /*1'b1*/ WAIT_n        ),   // WAIT 
+	.INT_n    ( /*1'b1*/ video_vs      ),   // VSYNC interrupt
 	.NMI_n    ( 1'b1          ),   // connected to VCC
 	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
 	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
@@ -183,7 +183,7 @@ T80se T80se (
 	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
 	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
 	.A        ( cpu_addr      ),   // 16 bit address bus
-	.DI       ( sdram_dout /*cpu_din*/       ),   // 8 bit data bus (input)
+	.DI       ( /*sdram_dout*/ cpu_din       ),   // 8 bit data bus (input)
 	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
 
@@ -237,7 +237,7 @@ VTL_chip VTL_chip
 	.sdram_din    ( vdc_sdram_din    ),
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
-	.sdram_dout   ( /*sdram_dout*/ 0 )
+	.sdram_dout   ( sdram_dout /*0*/ )
 );
 
 // TODO add scandoubler
@@ -359,19 +359,19 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
-/*
+
 assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
 assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
 assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
 assign sdram_rd   = dio_download ? 1'b1      : vdc_sdram_rd;
-*/
 
+
+/*
 assign sdram_din  = dio_download ? dio_data  : cpu_dout;
 assign sdram_addr = dio_download ? dio_addr  : { 9'd0, cpu_addr };
 assign sdram_wr   = dio_download ? dio_write : ~cpu_wr_n;
 assign sdram_rd   = dio_download ? 1'b1      : ~cpu_rd_n;
-
-//wire [7:0] cpu_din = cpuStarted ? sdram_dout : 'bz;
+*/
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip
