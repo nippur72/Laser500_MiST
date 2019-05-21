@@ -206,7 +206,7 @@ always@(posedge F14M) begin
 		end
 		if(clk_div == 4 && MREQ_n == 0) begin
 			if(~RD_n) begin
-				if(mapped_io) DI <= { cassette_bit_in, KD }; // memory mapped_io	  
+				if(mapped_io) DI <= 8'hff; //{ cassette_bit_in, KD }; // memory mapped_io	  
 				else          DI <= sdram_dout;              // normal RAM/ROM
 			end			
 			sdram_wr <= 0;		
@@ -607,7 +607,7 @@ assign b =
 	wire        mapped_io     = bank == 2 && (base_addr >= 14'h2800 && base_addr <= 14'h2FFF);
 	
 	wire [24:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
-	wire [24:0] cpuReadAddress = { 7'd0, banks[bank], base_addr };		
+	wire [24:0] cpuReadAddress = { 7'd0, bank, base_addr };		
 	
 	assign sdram_addr = (clk_div == 0 || clk_div == 7 || clk_div == 1) ? videoAddress :
 						     (clk_div == 3 || clk_div == 4 || clk_div == 5) ? cpuReadAddress : 0 ;

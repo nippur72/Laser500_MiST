@@ -183,7 +183,7 @@ T80se T80se (
 	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
 	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
 	.A        ( cpu_addr      ),   // 16 bit address bus
-	.DI       ( /*sdram_dout*/ cpu_din       ),   // 8 bit data bus (input)
+	.DI       ( cpu_din       ),   // 8 bit data bus (input)
 	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
 
@@ -237,7 +237,7 @@ VTL_chip VTL_chip
 	.sdram_din    ( vdc_sdram_din    ),
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
-	.sdram_dout   ( sdram_dout /*0*/ )
+	.sdram_dout   ( sdram_dout       )
 );
 
 // TODO add scandoubler
@@ -275,8 +275,8 @@ reg cpuStarted = 0;
 always @(posedge F14M) begin
 	st_resetD <= st_reset;
 	if(st_reset == 1 && st_resetD == 0) begin
-		cpuStarted <= 1;		
-	end	
+		cpuStarted <= !cpuStarted;		
+	end		
 
 	if(cpuStarted && cpu_addr == 'h66C8)
 		LEDStatus <= 0;
