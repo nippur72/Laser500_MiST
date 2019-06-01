@@ -122,6 +122,7 @@ wire [ 7:0] KD;
 
 wire kaa;
 
+/*
 wire [7:0] keys;
 keyboard keyboard (
 	.reset    ( !cpuStarted ),
@@ -132,11 +133,11 @@ keyboard keyboard (
 	
 	.keys     ( keys         )
 );
+*/
 
-/*
 keyboard keyboard 
 (
-	.reset    ( cpu_reset    ),
+	.reset    ( !cpuStarted    ),
 	.clk      ( F14M  ),
 
 	.ps2_clk  ( ps2_kbd_clk  ),
@@ -146,7 +147,7 @@ keyboard keyboard
 	.KA     ( KA         ),
 	.kaa    ( kaa        )
 );
-*/
+
 		 
 //
 // data_io
@@ -323,7 +324,7 @@ always @(posedge F14M) begin
 	/*if(cpuStarted && cpu_addr == 'h66C8)
 		LEDStatus <= 0;	*/
 
-	LEDStatus <= ~keys[2];
+	LEDStatus <= kaa;
 end
 
 //
