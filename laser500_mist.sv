@@ -108,13 +108,11 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
 
 // the MiST emulates a PS2 keyboard and mouse
 
-/*
 // 15kHz ps2 clock from 14Mhz  clock
 wire ps2_clock = xclk_div[12];
 reg [12:0] xclk_div;
 always @(posedge F14M)
         xclk_div <= xclk_div + 14'd1;
-*/
 		  
 wire ps2_kbd_clk;
 wire ps2_kbd_data;
@@ -126,7 +124,7 @@ wire kaa;
 
 wire [7:0] keys;
 keyboard keyboard (
-	.reset    ( cpu_reset    ),
+	.reset    ( !cpuStarted ),
 	.clk      ( F14M         ),
 
 	.ps2_clk  ( ps2_kbd_clk  ),
