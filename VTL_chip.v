@@ -18,6 +18,10 @@ module VTL_chip
 	input      [7:0] DO,          // 8 bit data output from cpu
 	output reg [7:0] DI,          // 8 bit data input for cpu
 	
+	// keyboard lines 
+	input [11:0] KA,   
+	input [ 6:0] KD,    
+	
 	// sdram interface
 	output     [24:0] sdram_addr, // sdram address  
 	input       [7:0] sdram_dout, // sdram data ouput
@@ -90,8 +94,6 @@ reg speaker_A                   ; // mapped to bit 0
 
 // memory mapped I/O read registers
 reg cassette_bit_in;
-reg [7:0] KD;
-reg [7:0] KA;
 
 // TODO use real 1bit colors
 parameter col0 = 12'h000;  // black 
@@ -116,7 +118,20 @@ rom_charset rom_charset (
 	.clock(F14M),
 	.q(charsetQ)
 );	
-	
+
+// keyboard matrix extended lines decoder, only Q0-Q3 output is used, so values > 3 are mapped
+wire [3:0] KEXT = A[10:8] == 0 ? 1 :
+						A[10:8] == 1 ? 2 :
+						A[10:8] == 2 ? 4 : 
+						A[10:8] == 3 ? 8 : 
+						A[10:8] == 4 ? 0 :
+						A[10:8] == 5 ? 0 :
+						A[10:8] == 6 ? 0 : 
+						A[10:8] == 7 ? 0 : 0;
+
+// keybaord matrix expanded row
+wire [11:0] KR = { KEXT, base_addr[7:0] } & KA;							  						
+							  
 wire[9:0] load_column;    // column where the ramAddress is initialized, changes depending on the video mode
 
 wire [3:0] fg;
@@ -206,8 +221,18 @@ always@(posedge F14M) begin
 		end
 		if(clk_div == 4 && MREQ_n == 0) begin
 			if(~RD_n) begin
-				if(mapped_io) DI <= 8'hff; //{ cassette_bit_in, KD }; // memory mapped_io	  
-				else          DI <= sdram_dout;              // normal RAM/ROM
+				if(mapped_io) begin	               
+					DI[7] <= cassette_bit_in;					
+					DI[6] <= (KR>0) & KD[6];					
+					DI[5] <= (KR>0) & KD[5];					
+					DI[4] <= (KR>0) & KD[4];					
+					DI[3] <= (KR>0) & KD[3];					
+					DI[2] <= (KR>0) & KD[2];					
+					DI[1] <= (KR>0) & KD[1];					
+					DI[0] <= (KR>0) & KD[0];					
+				end	
+				else 
+				   DI <= sdram_dout;              // normal RAM/ROM
 			end			
 			sdram_wr <= 0;		
 		end

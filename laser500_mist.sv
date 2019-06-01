@@ -107,23 +107,48 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
 );
 
 // the MiST emulates a PS2 keyboard and mouse
+
+/*
+// 15kHz ps2 clock from 14Mhz  clock
+wire ps2_clock = xclk_div[12];
+reg [12:0] xclk_div;
+always @(posedge F14M)
+        xclk_div <= xclk_div + 14'd1;
+*/
+		  
 wire ps2_kbd_clk;
 wire ps2_kbd_data;
 
-wire [13:0] KA;
+wire [11:0] KA;
 wire [ 7:0] KD;
 
-keyboard keyboard 
-(
+wire kaa;
+
+wire [7:0] keys;
+keyboard keyboard (
 	.reset    ( cpu_reset    ),
 	.clk      ( F14M         ),
 
 	.ps2_clk  ( ps2_kbd_clk  ),
 	.ps2_data ( ps2_kbd_data ),
 	
-	.KD     ( KD         ),
-	.KA     ( KA         )
+	.keys     ( keys         )
 );
+
+/*
+keyboard keyboard 
+(
+	.reset    ( cpu_reset    ),
+	.clk      ( F14M  ),
+
+	.ps2_clk  ( ps2_kbd_clk  ),
+	.ps2_data ( ps2_kbd_data ),
+	
+	.KD     ( KD         ),
+	.KA     ( KA         ),
+	.kaa    ( kaa        )
+);
+*/
 		 
 //
 // data_io
@@ -171,9 +196,9 @@ wire        cpu_iorq_n;
 // include Z80 CPU
 T80se T80se (
 	.RESET_n  ( cpuStarted /*!cpu_reset*/    ),   // TODO connect to RESET key
-	.CLK_n    ( F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
-	.CLKEN    ( CPUENA & cpuStarted ),   // CPU enable
-	.WAIT_n   ( /*1'b1*/ WAIT_n        ),   // WAIT 
+	.CLK_n    ( ~F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
+	.CLKEN    ( CPUENA /*& cpuStarted*/ ),   // CPU enable
+	.WAIT_n   ( /*1'b1*/ cpuStarted /*WAIT_n*/        ),   // WAIT 
 	.INT_n    ( /*1'b1*/ video_vs      ),   // VSYNC interrupt
 	.NMI_n    ( 1'b1          ),   // connected to VCC
 	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
@@ -237,7 +262,11 @@ VTL_chip VTL_chip
 	.sdram_din    ( vdc_sdram_din    ),
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
-	.sdram_dout   ( sdram_dout       )
+	.sdram_dout   ( sdram_dout       ), 
+	
+	// keyboard
+	.KA           ( KA ),
+	.KD           ( KD )
 );
 
 // TODO add scandoubler
@@ -259,27 +288,44 @@ always @(posedge F14M) begin
 end
 */
 
+
+
 reg [7:0] cpu_reset_cnt = 8'h00;
 wire cpu_reset = (cpu_reset_cnt != 255);
 always @(posedge F14M) begin
-	if(!pll_locked)
-		cpu_reset_cnt <= 8'd0;
+	if(!pll_locked) 
+		cpu_reset_cnt <= 8'd0;			
 	else 
 		if(cpu_reset_cnt != 255)
 			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
 end
 
 reg st_resetD;
-reg cpuStarted = 0;
+
+
+reg [64:0] cpu_started_cnt = 0;
+wire cpuStarted = (cpu_started_cnt == 9000000);
+always @(posedge F14M) begin
+	if(!pll_locked || (st_reset == 1 && st_resetD == 0)) 
+		cpu_started_cnt <= 0;			
+	else 
+		if(cpu_started_cnt != 9000000)
+			cpu_started_cnt <= cpu_started_cnt + 1;
+end
 
 always @(posedge F14M) begin
 	st_resetD <= st_reset;
+
+	/*
 	if(st_reset == 1 && st_resetD == 0) begin
 		cpuStarted <= !cpuStarted;		
 	end		
+	*/
 
-	if(cpuStarted && cpu_addr == 'h66C8)
-		LEDStatus <= 0;
+	/*if(cpuStarted && cpu_addr == 'h66C8)
+		LEDStatus <= 0;	*/
+
+	LEDStatus <= ~keys[2];
 end
 
 //

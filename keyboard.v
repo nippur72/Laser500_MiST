@@ -6,16 +6,85 @@ module keyboard (
 	input ps2_clk,
 	input ps2_data,
 	
-	// keyboard matrix 14x7 in negated logic 0=key pressed, 1=key released
-	output reg [13:0] KA,   // KA 14 row    lines mapped into address bus 
-	output reg [ 6:0] KD    // KD  7 column lines mapped into data bus    
+	// decodes keys
+	output reg [7:0] keys
+);
+
+wire [7:0] byte;
+wire valid;
+wire error;
+
+reg key_released;
+reg key_extended;
+
+always @(posedge clk) begin
+	if(reset) begin
+		keys <= 8'h00;
+      key_released <= 1'b0;
+      key_extended <= 1'b0;
+	end else begin
+		// ps2 decoder has received a valid byte
+		if(valid) begin
+			if(byte == 8'he0) 
+				// extended key code
+            key_extended <= 1'b1;
+         else if(byte == 8'hf0)
+				// release code
+            key_released <= 1'b1;
+         else begin
+				key_extended <= 1'b0;
+				key_released <= 1'b0;
+				
+				case(byte)
+					8'h29:  keys[0] <= !key_released;   // <SPACE>
+					8'h1b:  keys[1] <= !key_released;   // S
+					8'h21:  keys[2] <= !key_released;   // C
+				endcase
+			end
+		end
+	end
+end
+
+// the ps2 decoder has been taken from the zx spectrum core
+ps2_intf ps2_keyboard (
+	.CLK		 ( clk             ),
+	.nRESET	 ( !reset          ),
+	
+	// PS/2 interface
+	.PS2_CLK  ( ps2_clk         ),
+	.PS2_DATA ( ps2_data        ),
+	
+	// Byte-wide data interface - only valid for one clock
+	// so must be latched externally if required
+	.DATA		  ( byte   ),
+	.VALID	  ( valid  ),
+	.ERROR	  ( error  )
+);
+
+
+endmodule
+
+/*
+module keyboard ( 
+	input clk,
+	input reset,
+
+	// ps2 interface	
+	input ps2_clk,
+	input ps2_data,
+	
+	// keyboard matrix 14x7, 1=key pressed, 0=key released
+	output reg [11:0] KA,   // KA 14 row     
+	output reg [ 6:0] KD,   // KD  7 column   
+	
+	output reg kaa
 );
 
 wire [7:0] databyte;
 wire valid;
 wire error;
 
-reg key_released;
+reg key_status;
 reg key_extended;
 
 // TODO handle reset key
@@ -103,99 +172,102 @@ parameter [15:0] KEY_DOWN          = 'he072;
 
 always @(posedge clk) begin
 	if(reset) begin
-		KA <= 14'b11111111111111;
-		KD <=  7'b1111111;
-      key_released <= 1'b0;
-      key_extended <= 1'b0;
+		KA <= 0;
+		KD <= 0;
+      key_status <= 0;
+      key_extended <= 0;
+		kaa <= 0;
 	end else begin
 		// ps2 decoder has received a valid byte
 		if(valid) begin
 			if(databyte == 8'he0) 
 				// extended key code
-            key_extended <= 1'b1;
+            key_extended <= 1;
          else if(databyte == 8'hf0)
 				// release code
-            key_released <= 1'b1;
+            key_status <= 1;
          else begin
-				key_extended <= 1'b0;
-				key_released <= 1'b0;
+				key_extended <= 0;
+				key_status   <= 0;
+				
+				if(databyte == 'h22) kaa <= 1;
 				
 				case({ key_extended ? 'he0 : 'h00 , databyte })
-					KEY_SHIFT        : begin KA['h0] <= key_released; KD[6] <= key_released; end
-					KEY_Z            : begin KA['h0] <= key_released; KD[5] <= key_released; end 
-					KEY_X            : begin KA['h0] <= key_released; KD[4] <= key_released; end 
-					KEY_C            : begin KA['h0] <= key_released; KD[3] <= key_released; end 
-					KEY_V            : begin KA['h0] <= key_released; KD[2] <= key_released; end 
-					KEY_B            : begin KA['h0] <= key_released; KD[1] <= key_released; end 
-					KEY_N            : begin KA['h0] <= key_released; KD[0] <= key_released; end 
-					KEY_CONTROL      : begin KA['h1] <= key_released; KD[6] <= key_released; end
-					KEY_A            : begin KA['h1] <= key_released; KD[5] <= key_released; end   
-					KEY_S            : begin KA['h1] <= key_released; KD[4] <= key_released; end   
-					KEY_D            : begin KA['h1] <= key_released; KD[3] <= key_released; end   
-					KEY_F            : begin KA['h1] <= key_released; KD[2] <= key_released; end   
-					KEY_G            : begin KA['h1] <= key_released; KD[1] <= key_released; end   
-					KEY_H            : begin KA['h1] <= key_released; KD[0] <= key_released; end   
-					KEY_TAB          : begin KA['h2] <= key_released; KD[6] <= key_released; end
-					KEY_Q            : begin KA['h2] <= key_released; KD[5] <= key_released; end      
-					KEY_W            : begin KA['h2] <= key_released; KD[4] <= key_released; end      
-					KEY_E            : begin KA['h2] <= key_released; KD[3] <= key_released; end      
-					KEY_R            : begin KA['h2] <= key_released; KD[2] <= key_released; end      
-					KEY_T            : begin KA['h2] <= key_released; KD[1] <= key_released; end      
-					KEY_Y            : begin KA['h2] <= key_released; KD[0] <= key_released; end      
-					KEY_ESC          : begin KA['h3] <= key_released; KD[6] <= key_released; end
-					KEY_1            : begin KA['h3] <= key_released; KD[5] <= key_released; end 
-					KEY_2            : begin KA['h3] <= key_released; KD[4] <= key_released; end 
-					KEY_3            : begin KA['h3] <= key_released; KD[3] <= key_released; end 
-					KEY_4            : begin KA['h3] <= key_released; KD[2] <= key_released; end 
-					KEY_5            : begin KA['h3] <= key_released; KD[1] <= key_released; end 
-					KEY_6            : begin KA['h3] <= key_released; KD[0] <= key_released; end 
-					KEY_EQUAL        : begin KA['h4] <= key_released; KD[5] <= key_released; end 
-					KEY_MINUS        : begin KA['h4] <= key_released; KD[4] <= key_released; end 
-					KEY_0            : begin KA['h4] <= key_released; KD[3] <= key_released; end 
-					KEY_9            : begin KA['h4] <= key_released; KD[2] <= key_released; end 
-					KEY_8            : begin KA['h4] <= key_released; KD[1] <= key_released; end 
-					KEY_7            : begin KA['h4] <= key_released; KD[0] <= key_released; end 
-					KEY_BS           : begin KA['h5] <= key_released; KD[6] <= key_released; end 
-					KEY_P            : begin KA['h5] <= key_released; KD[3] <= key_released; end 
-					KEY_O            : begin KA['h5] <= key_released; KD[2] <= key_released; end 
-					KEY_I            : begin KA['h5] <= key_released; KD[1] <= key_released; end 
-					KEY_U            : begin KA['h5] <= key_released; KD[0] <= key_released; end 
-					KEY_RETURN       : begin KA['h6] <= key_released; KD[6] <= key_released; end                        
-					KEY_QUOTE        : begin KA['h6] <= key_released; KD[4] <= key_released; end
-					KEY_SEMICOLON    : begin KA['h6] <= key_released; KD[3] <= key_released; end
-					KEY_L            : begin KA['h6] <= key_released; KD[2] <= key_released; end
-					KEY_K            : begin KA['h6] <= key_released; KD[1] <= key_released; end
-					KEY_J            : begin KA['h6] <= key_released; KD[0] <= key_released; end                                                       
-					KEY_GRAPH        : begin KA['h7] <= key_released; KD[6] <= key_released; end 
-					KEY_BACK_QUOTE   : begin KA['h7] <= key_released; KD[5] <= key_released; end 
-					KEY_SPACE        : begin KA['h7] <= key_released; KD[4] <= key_released; end
-					KEY_SLASH        : begin KA['h7] <= key_released; KD[3] <= key_released; end 
-					KEY_DOT          : begin KA['h7] <= key_released; KD[2] <= key_released; end 
-					KEY_COMMA        : begin KA['h7] <= key_released; KD[1] <= key_released; end 
-					KEY_M            : begin KA['h7] <= key_released; KD[0] <= key_released; end 
-					KEY_BACKSLASH    : begin KA['hA] <= key_released; KD[5] <= key_released; end 
-					KEY_CLOSE_BRACKET: begin KA['hA] <= key_released; KD[4] <= key_released; end 
-					KEY_OPEN_BRACKET : begin KA['hA] <= key_released; KD[3] <= key_released; end 
-					KEY_MU           : begin KA['hA] <= key_released; KD[2] <= key_released; end 
-					KEY_DEL          : begin KA['hA] <= key_released; KD[1] <= key_released; end 
-					KEY_INS          : begin KA['hA] <= key_released; KD[0] <= key_released; end  
-					KEY_CAP_LOCK     : begin KA['hB] <= key_released; KD[6] <= key_released; end 
-					KEY_DEL_LINE     : begin KA['hB] <= key_released; KD[5] <= key_released; end 
-					KEY_CLS_HOME     : begin KA['hB] <= key_released; KD[4] <= key_released; end 
-					KEY_UP           : begin KA['hB] <= key_released; KD[3] <= key_released; end 
-					KEY_LEFT         : begin KA['hB] <= key_released; KD[2] <= key_released; end 
-					KEY_RIGHT        : begin KA['hB] <= key_released; KD[1] <= key_released; end 
-					KEY_DOWN         : begin KA['hB] <= key_released; KD[0] <= key_released; end 
-					KEY_F1           : begin KA['hC] <= key_released; KD[5] <= key_released; end 
-					KEY_F2           : begin KA['hC] <= key_released; KD[4] <= key_released; end 
-					KEY_F3           : begin KA['hC] <= key_released; KD[3] <= key_released; end 
-					KEY_F4           : begin KA['hC] <= key_released; KD[2] <= key_released; end    
-					KEY_F10          : begin KA['hD] <= key_released; KD[5] <= key_released; end   
-					KEY_F9           : begin KA['hD] <= key_released; KD[4] <= key_released; end   
-					KEY_F8           : begin KA['hD] <= key_released; KD[3] <= key_released; end   
-					KEY_F7           : begin KA['hD] <= key_released; KD[2] <= key_released; end 
-					KEY_F6           : begin KA['hD] <= key_released; KD[1] <= key_released; end 
-					KEY_F5           : begin KA['hD] <= key_released; KD[0] <= key_released; end
+					KEY_SHIFT        : begin KA['h0] <= key_status; KD[6] <= key_status; end
+					KEY_Z            : begin KA['h0] <= key_status; KD[5] <= key_status; end 
+					KEY_X            : begin KA['h0] <= key_status; KD[4] <= key_status; end 
+					KEY_C            : begin KA['h0] <= key_status; KD[3] <= key_status; end 
+					KEY_V            : begin KA['h0] <= key_status; KD[2] <= key_status; end 
+					KEY_B            : begin KA['h0] <= key_status; KD[1] <= key_status; end 
+					KEY_N            : begin KA['h0] <= key_status; KD[0] <= key_status; end 
+					KEY_CONTROL      : begin KA['h1] <= key_status; KD[6] <= key_status; end
+					KEY_A            : begin KA['h1] <= key_status; KD[5] <= key_status; end   
+					KEY_S            : begin KA['h1] <= key_status; KD[4] <= key_status; end   
+					KEY_D            : begin KA['h1] <= key_status; KD[3] <= key_status; end   
+					KEY_F            : begin KA['h1] <= key_status; KD[2] <= key_status; end   
+					KEY_G            : begin KA['h1] <= key_status; KD[1] <= key_status; end   
+					KEY_H            : begin KA['h1] <= key_status; KD[0] <= key_status; end   
+					KEY_TAB          : begin KA['h2] <= key_status; KD[6] <= key_status; end
+					KEY_Q            : begin KA['h2] <= key_status; KD[5] <= key_status; end      
+					KEY_W            : begin KA['h2] <= key_status; KD[4] <= key_status; end      
+					KEY_E            : begin KA['h2] <= key_status; KD[3] <= key_status; end      
+					KEY_R            : begin KA['h2] <= key_status; KD[2] <= key_status; end      
+					KEY_T            : begin KA['h2] <= key_status; KD[1] <= key_status; end      
+					KEY_Y            : begin KA['h2] <= key_status; KD[0] <= key_status; end      
+					KEY_ESC          : begin KA['h3] <= key_status; KD[6] <= key_status; end
+					KEY_1            : begin KA['h3] <= key_status; KD[5] <= key_status; end 
+					KEY_2            : begin KA['h3] <= key_status; KD[4] <= key_status; end 
+					KEY_3            : begin KA['h3] <= key_status; KD[3] <= key_status; end 
+					KEY_4            : begin KA['h3] <= key_status; KD[2] <= key_status; end 
+					KEY_5            : begin KA['h3] <= key_status; KD[1] <= key_status; end 
+					KEY_6            : begin KA['h3] <= key_status; KD[0] <= key_status; end 
+					KEY_EQUAL        : begin KA['h4] <= key_status; KD[5] <= key_status; end 
+					KEY_MINUS        : begin KA['h4] <= key_status; KD[4] <= key_status; end 
+					KEY_0            : begin KA['h4] <= key_status; KD[3] <= key_status; end 
+					KEY_9            : begin KA['h4] <= key_status; KD[2] <= key_status; end 
+					KEY_8            : begin KA['h4] <= key_status; KD[1] <= key_status; end 
+					KEY_7            : begin KA['h4] <= key_status; KD[0] <= key_status; end 
+					KEY_BS           : begin KA['h5] <= key_status; KD[6] <= key_status; end 
+					KEY_P            : begin KA['h5] <= key_status; KD[3] <= key_status; end 
+					KEY_O            : begin KA['h5] <= key_status; KD[2] <= key_status; end 
+					KEY_I            : begin KA['h5] <= key_status; KD[1] <= key_status; end 
+					KEY_U            : begin KA['h5] <= key_status; KD[0] <= key_status; end 
+					KEY_RETURN       : begin KA['h6] <= key_status; KD[6] <= key_status; end                        
+					KEY_QUOTE        : begin KA['h6] <= key_status; KD[4] <= key_status; end
+					KEY_SEMICOLON    : begin KA['h6] <= key_status; KD[3] <= key_status; end
+					KEY_L            : begin KA['h6] <= key_status; KD[2] <= key_status; end
+					KEY_K            : begin KA['h6] <= key_status; KD[1] <= key_status; end
+					KEY_J            : begin KA['h6] <= key_status; KD[0] <= key_status; end                                                       
+					KEY_GRAPH        : begin KA['h7] <= key_status; KD[6] <= key_status; end 
+					KEY_BACK_QUOTE   : begin KA['h7] <= key_status; KD[5] <= key_status; end 
+					KEY_SPACE        : begin KA['h7] <= key_status; KD[4] <= key_status; end
+					KEY_SLASH        : begin KA['h7] <= key_status; KD[3] <= key_status; end 
+					KEY_DOT          : begin KA['h7] <= key_status; KD[2] <= key_status; end 
+					KEY_COMMA        : begin KA['h7] <= key_status; KD[1] <= key_status; end 
+					KEY_M            : begin KA['h7] <= key_status; KD[0] <= key_status; end 
+					KEY_BACKSLASH    : begin KA['h8] <= key_status; KD[5] <= key_status; end 
+					KEY_CLOSE_BRACKET: begin KA['h8] <= key_status; KD[4] <= key_status; end 
+					KEY_OPEN_BRACKET : begin KA['h8] <= key_status; KD[3] <= key_status; end 
+					KEY_MU           : begin KA['h8] <= key_status; KD[2] <= key_status; end 
+					KEY_DEL          : begin KA['h8] <= key_status; KD[1] <= key_status; end 
+					KEY_INS          : begin KA['h8] <= key_status; KD[0] <= key_status; end  
+					KEY_CAP_LOCK     : begin KA['h9] <= key_status; KD[6] <= key_status; end 
+					KEY_DEL_LINE     : begin KA['h9] <= key_status; KD[5] <= key_status; end 
+					KEY_CLS_HOME     : begin KA['h9] <= key_status; KD[4] <= key_status; end 
+					KEY_UP           : begin KA['h9] <= key_status; KD[3] <= key_status; end 
+					KEY_LEFT         : begin KA['h9] <= key_status; KD[2] <= key_status; end 
+					KEY_RIGHT        : begin KA['h9] <= key_status; KD[1] <= key_status; end 
+					KEY_DOWN         : begin KA['h9] <= key_status; KD[0] <= key_status; end 
+					KEY_F1           : begin KA['hA] <= key_status; KD[5] <= key_status; end 
+					KEY_F2           : begin KA['hA] <= key_status; KD[4] <= key_status; end 
+					KEY_F3           : begin KA['hA] <= key_status; KD[3] <= key_status; end 
+					KEY_F4           : begin KA['hA] <= key_status; KD[2] <= key_status; end    
+					KEY_F10          : begin KA['hB] <= key_status; KD[5] <= key_status; end   
+					KEY_F9           : begin KA['hB] <= key_status; KD[4] <= key_status; end   
+					KEY_F8           : begin KA['hB] <= key_status; KD[3] <= key_status; end   
+					KEY_F7           : begin KA['hB] <= key_status; KD[2] <= key_status; end 
+					KEY_F6           : begin KA['hB] <= key_status; KD[1] <= key_status; end 
+					KEY_F5           : begin KA['hB] <= key_status; KD[0] <= key_status; end
 				endcase
 			end
 		end
@@ -220,3 +292,4 @@ ps2_intf ps2_keyboard (
 
 
 endmodule
+*/
