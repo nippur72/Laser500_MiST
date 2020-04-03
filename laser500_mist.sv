@@ -54,7 +54,7 @@ localparam CONF_STR = {
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
-wire [7:0] status;       // the status register is controlled by the on screen display (OSD)
+wire [7:0] status;       // the status register is controlled by the user_io module
 
 wire st_poweron  = status[0];
 wire st_scalines = status[1];
@@ -117,35 +117,19 @@ always @(posedge F14M)
 wire ps2_kbd_clk;
 wire ps2_kbd_data;
 
-wire [11:0] KA;
-wire [ 7:0] KD;
-
-wire kaa;
-
-/*
-wire [7:0] keys;
-keyboard keyboard (
-	.reset    ( !cpuStarted ),
-	.clk      ( F14M         ),
-
-	.ps2_clk  ( ps2_kbd_clk  ),
-	.ps2_data ( ps2_kbd_data ),
-	
-	.keys     ( keys         )
-);
-*/
+wire [10:0] KA_n;
+wire [ 6:0] KD_n;
 
 keyboard keyboard 
 (
-	.reset    ( !cpuStarted    ),
+	.reset    ( RESET ),
 	.clk      ( F14M  ),
 
 	.ps2_clk  ( ps2_kbd_clk  ),
 	.ps2_data ( ps2_kbd_data ),
 	
-	.KD     ( KD         ),
-	.KA     ( KA         ),
-	.kaa    ( kaa        )
+	.KD_n     ( KD_n ),
+	.KA_n     ( KA_n ) 
 );
 
 		 
@@ -173,15 +157,25 @@ data_io data_io (
    .addr  ( dio_addr  ),
    .data  ( dio_data  )
 );
-		 
+	
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** CPU ********************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+	
 //
 // Z80 CPU
 //
 	
 // CPU control signals
-wire        CPUCK;
-wire        CPUENA;
-wire        WAIT_n;
+wire        CPUCK;          // CPU Clock not used yet
+wire        CPUENA;         // CPU enable
+wire        WAIT_n;         // CPU WAIT (not implemented)
 wire [15:0] cpu_addr;
 wire [7:0]  cpu_din;
 wire [7:0]  cpu_dout;
@@ -194,13 +188,13 @@ wire        cpu_iorq_n;
 
 // include Z80 CPU
 T80se T80se (
-	.RESET_n  ( cpuStarted /*!cpu_reset*/    ),   // TODO connect to RESET key
-	.CLK_n    ( ~F14M          ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
-	.CLKEN    ( CPUENA /*& cpuStarted*/ ),   // CPU enable
-	.WAIT_n   ( /*1'b1*/ cpuStarted /*WAIT_n*/        ),   // WAIT 
-	.INT_n    ( /*1'b1*/ video_vs      ),   // VSYNC interrupt
-	.NMI_n    ( 1'b1          ),   // connected to VCC
-	.BUSRQ_n  ( 1'b1          ),   // connected to VCC
+	.RESET_n  ( ~RESET        ),   // RESET
+	.CLK_n    ( ~F14M         ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
+	.CLKEN    ( CPUENA        ),   // CPU enable
+	.WAIT_n   ( ~RESET        ),   // WAIT (TODO implement wait states?)
+	.INT_n    ( video_vs      ),   // VSYNC interrupt
+	.NMI_n    ( 1'b1          ),   // connected to VCC on the Laser 500
+	.BUSRQ_n  ( 1'b1          ),   // connected to VCC on the Laser 500
 	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
 	.M1_n     ( cpu_m1_n      ),   // M1==0 && MREQ==0 cpu is fetching, M1==0 && IORQ==0 ack interrupt
 	.IORQ_n   ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
@@ -210,6 +204,18 @@ T80se T80se (
 	.DI       ( cpu_din       ),   // 8 bit data bus (input)
 	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
+
+
+
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** VTL CHIP ***************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
 
 //
 // VTL CHIP GA1
@@ -231,9 +237,9 @@ wire  [7:0] vdc_sdram_din;
 // VTL custom chip
 VTL_chip VTL_chip 
 (	
-	.RESET  ( cpu_reset   ),
+	.RESET  ( RESET       ),
 	.F14M   ( F14M        ),
-	.WAIT_n ( WAIT_n      ),
+	.WAIT_n ( WAIT_n      ),   // wait state for the CPU (TODO to be implemented yet)
 	
 	// cpu
    .CPUCK    ( CPUCK         ),
@@ -264,81 +270,89 @@ VTL_chip VTL_chip
 	.sdram_dout   ( sdram_dout       ), 
 	
 	// keyboard
-	.KA           ( KA ),
-	.KD           ( KD )
+	.KA_n         ( KA_n ),
+	.KD_n         ( KD_n )
 );
 
 // TODO add scandoubler
 assign VGA_HS = ~(~video_hs | ~video_vs);
 assign VGA_VS = 1;
 
-// The CPU is kept in reset for further 256 cycles after the PLL is generating stable clocks
-// to make sure things like the SDRAM have some time to initialize
 
-/*
-reg [9:0] cpu_reset_cnt = 0;
-wire cpu_reset = (cpu_reset_cnt != 1023);
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** CLOCK AND PLL **********************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+
+// F14M is the main 14MHz clock
+// ram_clock is faster clock for the SDRAM chip, 1 complete read/write cycle in two F14M cyles
+// pll_locked flags PLL is locked
+
+wire pll_locked;
+
+pll pll (
+	 .inclk0 ( CLOCK_27[0]   ),
+	 .locked ( pll_locked    ),        // PLL is running stable
+	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
+	 .c1     ( ram_clock     ),        // F14M x 4 	 
+	 .c2     ( F3M           )         // F14M / 4 	 
+);
+
+
+// holds RESET=1 until 9,000,000 clock cycles so that pll is locked and ROM is downloaded
+
+wire RESET = (cpu_counter != 9000000);
+reg [64:0] cpu_counter = 0;
 always @(posedge F14M) begin
-	if(!pll_locked || st_poweron || st_reset || dio_download)
-		cpu_reset_cnt <= 0;
+	if(!pll_locked || reset_pressed) 
+		cpu_counter <= 0;			
 	else 
-		if(cpu_reset_cnt != 1023)
-			cpu_reset_cnt <= cpu_reset_cnt + 1;
-end
-*/
-
-
-
-reg [7:0] cpu_reset_cnt = 8'h00;
-wire cpu_reset = (cpu_reset_cnt != 255);
-always @(posedge F14M) begin
-	if(!pll_locked) 
-		cpu_reset_cnt <= 8'd0;			
-	else 
-		if(cpu_reset_cnt != 255)
-			cpu_reset_cnt <= cpu_reset_cnt + 8'd1;
+		if(cpu_counter != 9000000)
+			cpu_counter <= cpu_counter + 1;
 end
 
+
+// detects menu reset button press on the OSD menu
+wire reset_pressed = (st_reset == 1 && st_resetD == 0);
 reg st_resetD;
-
-
-reg [64:0] cpu_started_cnt = 0;
-wire cpuStarted = (cpu_started_cnt == 9000000);
-always @(posedge F14M) begin
-	if(!pll_locked || (st_reset == 1 && st_resetD == 0)) 
-		cpu_started_cnt <= 0;			
-	else 
-		if(cpu_started_cnt != 9000000)
-			cpu_started_cnt <= cpu_started_cnt + 1;
-end
-
 always @(posedge F14M) begin
 	st_resetD <= st_reset;
-
-	/*
-	if(st_reset == 1 && st_resetD == 0) begin
-		cpuStarted <= !cpuStarted;		
-	end		
-	*/
-
-	/*if(cpuStarted && cpu_addr == 'h66C8)
-		LEDStatus <= 0;	*/
-
-	LEDStatus <= kaa;
 end
+
+
+// debug keyboard on the LED
+always @(posedge F14M) begin
+	if(!RESET) LED_ON <= ~KA_n['h0];
+end
+
+
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** RAM ********************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
 
 //
 // RAM tester
 //
 reg [63:0] long_counter;
-reg LEDStatus = 1;
+reg LED_ON = 0;
 
-assign LED = LEDStatus;
+assign LED = ~LED_ON;
 
 /*
 always @(posedge F3M) begin
-	LEDStatus <= 1;
-	if(dio_download == 1 && LEDStatus == 1) LEDStatus <= 0;
+	LED_ON <= 1;
+	if(dio_download == 1 && LED_ON == 1) LED_ON <= 0;
 end
 */
 
@@ -356,21 +370,21 @@ always @(posedge F3M) begin
 		long_counter <= long_counter + 1;
 					
 		if(long_counter[23:0] == 0) begin
-			LEDStatus <= 1;
+			LED_ON <= 1;
 			test_rd <= 0;
 			test_wr <= 1;
 			test_addr <= 'h3800 | ('h7 << 14) ;
 			test_din <= 65;
 		end 
 		if(long_counter[23:0] == 200) begin
-			LEDStatus <= 1;
+			LED_ON <= 1;
 			test_rd <= 0;
 			test_wr <= 1;
 			test_addr <= 'h3801 | ('h7 << 14) ;
 			test_din <= 66;
 		end 
 		if(long_counter[23:0] == 400) begin
-			LEDStatus <= 1;
+			LED_ON <= 1;
 			test_rd <= 1;
 			test_wr <= 0;
 			test_addr <= 'h3801 | ('h7 << 14) ;			
@@ -381,7 +395,7 @@ always @(posedge F3M) begin
 			test_addr <= 0; //'h3800 | ('h7 << 14) ;				
 		end 
 		else if(long_counter[23:0] == 2097152+4) begin  
-			if(test_dout == 'hf3)	LEDStatus <= 0;   // 65
+			if(test_dout == 'hf3)	LED_ON <= 0;   // 65
 		end
 	end
 end
@@ -408,7 +422,7 @@ wire [7:0]  sdram_din  ;
 assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
 assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
 assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
-assign sdram_rd   = dio_download ? 1'b1      : vdc_sdram_rd;
+assign sdram_rd   = 1'b1; //dio_download ? 1'b1      : vdc_sdram_rd;
 
 
 /*
@@ -442,18 +456,5 @@ sdram sdram (
    .dout           ( sdram_dout                )	
 );
 	
-//
-// clocks
-//
-
-wire pll_locked;
-
-pll pll (
-	 .inclk0 ( CLOCK_27[0]   ),
-	 .locked ( pll_locked    ),        // PLL is running stable
-	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
-	 .c1     ( ram_clock     ),        // F14M x 4 	 
-	 .c2     ( F3M           )         // F14M / 4 	 
-);
 
 endmodule

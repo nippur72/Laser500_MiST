@@ -19,8 +19,8 @@ module VTL_chip
 	output reg [7:0] DI,          // 8 bit data input for cpu
 	
 	// keyboard lines 
-	input [11:0] KA,   
-	input [ 6:0] KD,    
+	input [10:0] KA_n,   
+	input [ 6:0] KD_n,    
 	
 	// sdram interface
 	output     [24:0] sdram_addr, // sdram address  
@@ -71,7 +71,6 @@ reg[12:0] charsetAddress; // address in charset ROM to read from
 wire[7:0] charsetQ;       // data ream from charset ROM
 
 reg[7:0]  ramQ;    // test
-reg[24:0] xadd;
 
 reg [3:0] pixel;          // pixel to draw (color index in the palette)
 
@@ -119,18 +118,8 @@ rom_charset rom_charset (
 	.q(charsetQ)
 );	
 
-// keyboard matrix extended lines decoder, only Q0-Q3 output is used, so values > 3 are mapped
-wire [3:0] KEXT = A[10:8] == 0 ? 1 :
-						A[10:8] == 1 ? 2 :
-						A[10:8] == 2 ? 4 : 
-						A[10:8] == 3 ? 8 : 
-						A[10:8] == 4 ? 0 :
-						A[10:8] == 5 ? 0 :
-						A[10:8] == 6 ? 0 : 
-						A[10:8] == 7 ? 0 : 0;
-
-// keybaord matrix expanded row
-wire [11:0] KR = { KEXT, base_addr[7:0] } & KA;							  						
+// keyboard matrix expanded row
+wire KADDR_selected = (~base_addr[10:0] & ~KA_n) != 11'b0;							  						
 							  
 wire[9:0] load_column;    // column where the ramAddress is initialized, changes depending on the video mode
 
@@ -142,18 +131,18 @@ assign hsync = (hcnt < hsw) ? 0 : 1;
 assign vsync = (vcnt <   2) ? 0 : 1;
 
 // set row address loading colum
-assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number === 5 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number === 4 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number === 3 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number === 2 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number === 1 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(4*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number === 0 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
-						  : vdc_text80_enabled ?                                        hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
-						  :                                                             hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8);
+assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number == 5 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
+						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 4 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
+						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 3 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
+						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 2 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
+						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 1 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(4*8)
+						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 0 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
+						  : vdc_text80_enabled ?                                       hsw+hbp+LEFT_BORDER_WIDTH-1-(1*8)
+						  :                                                            hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8);
 						  
 // calculate foreground and background colors						  
-assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number === 5 || vdc_graphic_mode_number === 2)) || vdc_text80_enabled ? vdc_text80_foreground : fgbg[7:4];
-assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number === 5 || vdc_graphic_mode_number === 2)) || vdc_text80_enabled ? vdc_text80_background : fgbg[3:0];
+assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || vdc_text80_enabled ? vdc_text80_foreground : fgbg[7:4];
+assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || vdc_text80_enabled ? vdc_text80_background : fgbg[3:0];
 
 // calculate x offset (TODO replace with hcnt or clk_div?)
 assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
@@ -161,11 +150,13 @@ assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
 wire [2:0] clk_div = hcnt[2:0];   // clock divider and bus slot assignment
 
 assign CPUCK  = clk_div[1];   // derive CPUCK by dividing F14M by 4
+// warning: CPUCK not used, F14M is fed into T80
+
 assign CPUENA = clk_div == 2; // CPU enabled signal
-wire   CV     = ~clk_div[2];  // CV=1 video owns bus, CV=0 CPU owns bus
+//wire   CV     = ~clk_div[2];  // CV=1 video owns bus, CV=0 CPU owns bus
 
 /*
-Details of the state machine:
+Details of the state machine (T=clk_div):
  
 VIDEO T=0
 VIDEO T=1	
@@ -181,7 +172,24 @@ CPU   T=6
 CPU   T=7  
 				end charset ROM reading, start video RAM reading
 				if CPU wait state, finish cpu RAM read/write, release CPU wait, present data to cpu
+
+T=0 video ram reading starts 
+T=1 video ram is reading
+T=2 video ram reading completed
+T=3 nothing
+T=4 video ram data transfered into video register
+    charset rom reading starts
+    cpu ram reading starts 
+T=5 cpu reading
+T=6 cpu reading completed
+T=7 cpu transfer    				
 */
+
+// negated signals (easier to read)
+wire MREQ = ~MREQ_n;
+wire WR = ~WR_n;
+wire RD = ~RD_n;
+wire IORQ = ~IORQ_n;
 
 always@(posedge F14M) begin
 
@@ -190,25 +198,22 @@ always@(posedge F14M) begin
 		vcnt <= 0;
 		pixel <= 0;		
 		banks[0] <= 0;
-		banks[1] <= 0;
-		banks[2] <= 0;
-		banks[3] <= 0;
+		//banks[1] <= 0;
+		//banks[2] <= 0;
+		//banks[3] <= 0;
 		WAIT_n <= 1;
 		sdram_rd <= 0;
 		sdram_wr <= 0;
 	end
-	else begin	
-			
-		xadd <= xadd + 1;
+	else begin				
+   	sdram_rd <= 1;					
 				
 		// concurrent CPU
-		if(clk_div == 3 && MREQ_n == 0) begin
-			sdram_rd <= 1; //~(~WR_n & bank_is_ram); //~RD_n;
-			sdram_wr <= ~WR_n & bank_is_ram;
+		if(clk_div == 3 && MREQ) begin
+			//sdram_rd <= 1; 
+			sdram_wr <= WR & bank_is_ram & ~mapped_io;
 			sdram_din <= DO;  			
-			// write also into mapped I/O
-			
-			if(mapped_io) begin
+			if(mapped_io & WR) begin
 				io_bit_7                 <= DO[7];
 				caps_lock_bit            <= DO[6];
 				speaker_B                <= DO[5];
@@ -219,22 +224,23 @@ always@(posedge F14M) begin
 				speaker_A                <= DO[0];
 			end			
 		end
-		if(clk_div == 4 && MREQ_n == 0) begin
-			if(~RD_n) begin
-				if(mapped_io) begin	               
+		
+		if(clk_div == 5 && MREQ) begin
+			sdram_wr <= 0; // terminate any memory write started at T=3
+			if(RD) begin
+				if(mapped_io) begin						
 					DI[7] <= cassette_bit_in;					
-					DI[6] <= (KR>0) & KD[6];					
-					DI[5] <= (KR>0) & KD[5];					
-					DI[4] <= (KR>0) & KD[4];					
-					DI[3] <= (KR>0) & KD[3];					
-					DI[2] <= (KR>0) & KD[2];					
-					DI[1] <= (KR>0) & KD[1];					
-					DI[0] <= (KR>0) & KD[0];					
-				end	
+					DI[6] <= ~(KADDR_selected & ~KD_n[6]);					
+					DI[5] <= ~(KADDR_selected & ~KD_n[5]);					
+					DI[4] <= ~(KADDR_selected & ~KD_n[4]);					
+					DI[3] <= ~(KADDR_selected & ~KD_n[3]);					
+					DI[2] <= ~(KADDR_selected & ~KD_n[2]);					
+					DI[1] <= ~(KADDR_selected & ~KD_n[1]);					
+					DI[0] <= ~(KADDR_selected & ~KD_n[0]);										
+				end				
 				else 
-				   DI <= sdram_dout;              // normal RAM/ROM
-			end			
-			sdram_wr <= 0;		
+				   DI <= sdram_dout; // read from RAM/ROM
+			end						
 		end
 		
 		/*	
@@ -272,16 +278,12 @@ always@(posedge F14M) begin
 		*/
 				
 		// Z80 IO ports
-		if(clk_div == 3 && IORQ_n == 0) begin
-			if(RD_n == 0) begin
+		if(clk_div == 3 && IORQ) begin
+			if(RD) begin
 				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
 				// TODO implement I/O read
 					//
-					//switch(port & 0xFF) {
-					//case 0x40: return banks[0];
-					//case 0x41: return banks[1];
-					//case 0x42: return banks[2];
-					//case 0x43: return banks[3];
+					//switch(port & 0xFF) {					
 					//case 0x2b: return joy0;  // joystick 8 directions
 					//case 0x27: return joy1;  // joystick fire buttons      
 					//case 0x00: return printerReady;                  
@@ -294,7 +296,7 @@ always@(posedge F14M) begin
 					//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   
 					
 			end
-			if(WR_n == 0) begin
+			if(WR) begin
 				case(A[7:0])
 					'h40: banks[0] <= DO[3:0];
 					'h41: banks[1] <= DO[3:0];
@@ -302,17 +304,20 @@ always@(posedge F14M) begin
 					'h43: banks[3] <= DO[3:0];
 					'h44:
 						begin	
-							vdc_page_7         <= !DO[3];
+							vdc_page_7         <= ~DO[3];
 							vdc_text80_enabled <= DO[0]; 
 							vdc_border_color   <= DO[7:4];
 							
-							//if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              
-							//if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
-							//if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
-							//if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
-							//if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
-							//if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
+							// if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              
+												
+							if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
 							
+							/*
+							if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
+							if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
+							if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
+							if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
+							*/
 						end
 					'h45:
 						begin
@@ -348,17 +353,7 @@ always@(posedge F14M) begin
 			else                            ycnt <= ycnt + 10'd1;
 		end
 		else hcnt <= hcnt + 10'd1;
-      
-		/*
-		// test		
-		if(xcnt[3:0] == 14) begin
-			ramQ <= (xcnt >> 4) + 35 + (ycnt >> 3);
-		end   
-		else if(xcnt[3:0] == 6) begin
-			ramQ <= 8'hf1;
-		end   		
-		*/
-	
+      	
 		// draw pixel at hcnt,vcnt
 		if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
 			pixel <= 0;   // blanking zone         
@@ -366,7 +361,7 @@ always@(posedge F14M) begin
 			pixel <= 'hC; // forced blank 	
 		else if( (vcnt < TOP_BORDER_WIDTH || vcnt >= TOP_BORDER_WIDTH + HEIGHT) || 
 					(hcnt < hsw+hbp + LEFT_BORDER_WIDTH || hcnt >= hsw+hbp + LEFT_BORDER_WIDTH + WIDTH)) 
-			pixel <= vdc_border_color; 
+			pixel <= vdc_border_color; 				
 		else 
 		begin
 			if(vdc_graphic_mode_enabled == 1) 
@@ -447,7 +442,7 @@ always@(posedge F14M) begin
 			// load start row address on the leftmost column
 			if(hcnt == load_column) begin
 				if(vdc_graphic_mode_enabled) begin
-					if(vdc_graphic_mode_number === 5 || vdc_graphic_mode_number === 4 || vdc_graphic_mode_number === 3) begin
+					if(vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 4 || vdc_graphic_mode_number == 3) begin
 						// GR 5, GR 4, GR 3                                                               
 						ramAddress[13] <= ycnt[2];
 						ramAddress[12] <= ycnt[1];
@@ -460,7 +455,7 @@ always@(posedge F14M) begin
 						ramAddress[ 5] <= ycnt[7];
 						ramAddress[ 4] <= ycnt[6];
 						ramAddress[3:0] <= 0;
-					end else if(vdc_graphic_mode_number === 2 || vdc_graphic_mode_number === 1) begin
+					end else if(vdc_graphic_mode_number == 2 || vdc_graphic_mode_number == 1) begin
 						// GR 2            
 						ramAddress[13] <= 1;
 						ramAddress[12] <= ycnt[2];
@@ -474,7 +469,7 @@ always@(posedge F14M) begin
 						ramAddress[ 4] <= ycnt[7];
 						ramAddress[ 3] <= ycnt[6];
 						ramAddress[2:0] <= 0;
-					end else if(vdc_graphic_mode_number === 0) begin
+					end else if(vdc_graphic_mode_number == 0) begin
 						// GR 0            
 						ramAddress[13] <= 1;
 						ramAddress[12] <= ycnt[2];
@@ -507,8 +502,6 @@ always@(posedge F14M) begin
 			else begin
 				ramAddress <= ramAddress + 1;  
 			end 			
-			sdram_rd <= 1;			
-			sdram_wr <= 0;					
 		end
 
 		// T=7 move saved latch to the pixel register 
@@ -601,8 +594,7 @@ assign g =
 	pixel == 4'hd ? { cold[7:4], 2'b00 } : 
 	pixel == 4'he ? { cole[7:4], 2'b00 } : 
 						 { colf[7:4], 2'b00 } ;
-					 
-									 
+					 									 
 assign b = 
 	pixel == 4'h0 ? { col0[3:0], 2'b00 } : 
 	pixel == 4'h1 ? { col1[3:0], 2'b00 } : 
@@ -624,12 +616,12 @@ assign b =
 	// ******************************************************************************						 					
 
 	// bank switching
-	reg   [3:0] banks[3:0];
-	wire  [3:0] bank          = banks[bank_sel];
-	wire  [1:0] bank_sel      = A[15:14];
+	reg   [3:0] banks[3:0];   // 4 switchable banks (16K each, 0 to F)
+	wire  [3:0] bank          = banks[bank_bits];
+	wire  [1:0] bank_bits     = A[15:14];  
 	wire [13:0] base_addr     = A[13:0];	
 	wire        bank_is_ram   = (bank >= 4 && bank <=7);  // TODO 350/700 ram config
-	wire        mapped_io     = bank == 2 && (base_addr >= 14'h2800 && base_addr <= 14'h2FFF);
+	wire        mapped_io     = bank == 2 /*&& (base_addr >= 14'h2800 && base_addr <= 14'h2FFF)*/;
 	
 	wire [24:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
 	wire [24:0] cpuReadAddress = { 7'd0, bank, base_addr };		
