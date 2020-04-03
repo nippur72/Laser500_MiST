@@ -1,5 +1,5 @@
 --
--- T80 Registers, technology independent
+-- T80 Registers for Xilinx Select RAM
 --
 -- Version : 0244
 --
@@ -46,7 +46,7 @@
 --
 --	0242 : Initial release
 --
---	0244 : Changed to single register file
+--	0244 : Removed UNISIM library and added componet declaration
 --
 
 library IEEE;
@@ -75,31 +75,93 @@ end T80_Reg;
 
 architecture rtl of T80_Reg is
 
-	type Register_Image is array (natural range <>) of std_logic_vector(7 downto 0);
-	signal	RegsH	: Register_Image(0 to 7);
-	signal	RegsL	: Register_Image(0 to 7);
+	component RAM16X1D
+		port(
+			DPO		: out std_ulogic;
+			SPO		: out std_ulogic;
+			A0		: in std_ulogic;
+			A1		: in std_ulogic;
+			A2		: in std_ulogic;
+			A3		: in std_ulogic;        
+			D		: in std_ulogic;
+			DPRA0	: in std_ulogic;
+			DPRA1	: in std_ulogic;
+			DPRA2	: in std_ulogic;
+			DPRA3	: in std_ulogic;
+			WCLK	: in std_ulogic;        
+			WE		: in std_ulogic);
+	end component;
+
+	signal	ENH		: std_logic;
+	signal	ENL		: std_logic;
 
 begin
 
-	process (Clk)
-	begin
-		if Clk'event and Clk = '1' then
-			if CEN = '1' then
-				if WEH = '1' then
-					RegsH(to_integer(unsigned(AddrA))) <= DIH;
-				end if;
-				if WEL = '1' then
-					RegsL(to_integer(unsigned(AddrA))) <= DIL;
-				end if;
-			end if;
-		end if;
-	end process;
+	ENH <= CEN and WEH;
+	ENL <= CEN and WEL;
 
-	DOAH <= RegsH(to_integer(unsigned(AddrA)));
-	DOAL <= RegsL(to_integer(unsigned(AddrA)));
-	DOBH <= RegsH(to_integer(unsigned(AddrB)));
-	DOBL <= RegsL(to_integer(unsigned(AddrB)));
-	DOCH <= RegsH(to_integer(unsigned(AddrC)));
-	DOCL <= RegsL(to_integer(unsigned(AddrC)));
+	bG1: for I in 0 to 7 generate
+	begin
+		Reg1H : RAM16X1D
+			port map(
+			DPO => DOBH(i),
+			SPO => DOAH(i),
+			A0 => AddrA(0),
+			A1 => AddrA(1),
+			A2 => AddrA(2),
+			A3 => '0',
+			D => DIH(i),
+			DPRA0 => AddrB(0),
+			DPRA1 => AddrB(1),
+			DPRA2 => AddrB(2),
+			DPRA3 => '0',
+			WCLK => Clk,
+			WE => ENH);
+		Reg1L : RAM16X1D
+			port map(
+			DPO => DOBL(i),
+			SPO => DOAL(i),
+			A0 => AddrA(0),
+			A1 => AddrA(1),
+			A2 => AddrA(2),
+			A3 => '0',
+			D => DIL(i),
+			DPRA0 => AddrB(0),
+			DPRA1 => AddrB(1),
+			DPRA2 => AddrB(2),
+			DPRA3 => '0',
+			WCLK => Clk,
+			WE => ENL);
+		Reg2H : RAM16X1D
+			port map(
+			DPO => DOCH(i),
+			SPO => open,
+			A0 => AddrA(0),
+			A1 => AddrA(1),
+			A2 => AddrA(2),
+			A3 => '0',
+			D => DIH(i),
+			DPRA0 => AddrC(0),
+			DPRA1 => AddrC(1),
+			DPRA2 => AddrC(2),
+			DPRA3 => '0',
+			WCLK => Clk,
+			WE => ENH);
+		Reg2L : RAM16X1D
+			port map(
+			DPO => DOCL(i),
+			SPO => open,
+			A0 => AddrA(0),
+			A1 => AddrA(1),
+			A2 => AddrA(2),
+			A3 => '0',
+			D => DIL(i),
+			DPRA0 => AddrC(0),
+			DPRA1 => AddrC(1),
+			DPRA2 => AddrC(2),
+			DPRA3 => '0',
+			WCLK => Clk,
+			WE => ENL);
+	end generate;
 
 end;
