@@ -249,13 +249,11 @@ wire        cpu_iorq_n;
 
 // include Z80 CPU
 T80se 
-/*
 #( 
   .Mode(0),     // : integer := 0;	-- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
   .T2Write(0),  // : integer := 0;	-- 0 => WR_n active in T3, /=0 => WR_n active in T2
   .IOWait(0)    // : integer := 0	-- 0 => Single cycle I/O, 1 => Std I/O cycle
 ) 
-*/
 T80se 
 (
 	.RESET_n  ( ~(RESET | reset_key) ),   // RESET
