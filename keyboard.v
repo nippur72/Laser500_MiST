@@ -7,26 +7,41 @@ module keyboard (
 	input ps2_clk,
 	input ps2_data,
 	
-	// decodes keys
-   output [10:0] KA_n,   // 11 bits on address bus, negated logic 0 = key pressed     
-	output [ 6:0] KD_n    // 7 bits on data bus, negated logic 0 = key pressed     
+	// VTL chip interface
+   input      [10:0] address,   
+	output     [ 6:0] KD,   
+	output reg reset_key,
+	
+	output debug
 );
 
-reg [11:0] KA;   // 12 keyboard matrix rows, A0-A7 + A,B,C,D; mapped onto address bus; 1 = key pressed     
-reg [ 6:0] KD;   // 7 keyboard matrix columns mapped onto data bus; 1 = key pressed       	
+// demux LS138 3 high bits int 4 bits
+wire [3:0] ABCD = (address[10:8] == 3'b000) ? 4'b1110 :
+                  (address[10:8] == 3'b001) ? 4'b1101 :
+                  (address[10:8] == 3'b010) ? 4'b1011 :
+                  (address[10:8] == 3'b011) ? 4'b0111 : 4'b1111;
 
-assign KA_n = ~( {KA_dec, KA[7:0]} );
-assign KD_n = ~KD;
+wire [11:0] KA = {ABCD, address[7:0]};
 
-// this implements the 74LS138 demultiplexer
-wire DCBA = KA[11:8];   // D, C, B, A input to demultiplexer
+// keyboard output
+assign KD = ((KA[ 0] == 0) ? KM[ 0] : 7'b1111111) & 
+            ((KA[ 1] == 0) ? KM[ 1] : 7'b1111111) &
+				((KA[ 2] == 0) ? KM[ 2] : 7'b1111111) &
+				((KA[ 3] == 0) ? KM[ 3] : 7'b1111111) &
+				((KA[ 4] == 0) ? KM[ 4] : 7'b1111111) &
+				((KA[ 5] == 0) ? KM[ 5] : 7'b1111111) &
+				((KA[ 6] == 0) ? KM[ 6] : 7'b1111111) &
+				((KA[ 7] == 0) ? KM[ 7] : 7'b1111111) &
+				((KA[ 8] == 0) ? KM[ 8] : 7'b1111111) &
+				((KA[ 9] == 0) ? KM[ 9] : 7'b1111111) &
+				((KA[10] == 0) ? KM[10] : 7'b1111111) &
+				((KA[11] == 0) ? KM[11] : 7'b1111111) ;
 
-// demultiplexer output
-wire [3:0] KA_dec = DCBA == 'b0000 ? 0 :
-					 	  DCBA == 'b0001 ? 1 :
-						  DCBA == 'b0010 ? 2 : 
-						  DCBA == 'b0100 ? 3 : 
-						  DCBA == 'b1000 ? 4 : 0;
+// debug
+assign debug = KM[0][0];
+				
+// keyboard matrix (12 rows x 7 columns)
+reg [6:0] KM [11:0]; 
 
 parameter [15:0] KEY_RESET         = 'h77; // as pause/break key -- not mapped on the I/O but directly on the /RES line to the CPU
 parameter [15:0] KEY_F1            = 'h05;
@@ -40,7 +55,7 @@ parameter [15:0] KEY_F8            = 'h0a;
 parameter [15:0] KEY_F9            = 'h01;
 parameter [15:0] KEY_F10           = 'h09;  // f11 8'h78, f12 8'h07
 parameter [15:0] KEY_INS           = 'he070;
-parameter [15:0] KEY_DEL           = 'he069;
+parameter [15:0] KEY_DEL           = 'he071;
 parameter [15:0] KEY_ESC           = 'h76;
 parameter [15:0] KEY_1             = 'h16;
 parameter [15:0] KEY_2             = 'h1e;
@@ -56,8 +71,8 @@ parameter [15:0] KEY_MINUS         = 'h4e;
 parameter [15:0] KEY_EQUAL         = 'h55;
 parameter [15:0] KEY_BACKSLASH     = 'h0e;
 parameter [15:0] KEY_BS            = 'h66;
-parameter [15:0] KEY_DEL_LINE      = 'he06c;
-parameter [15:0] KEY_CLS_HOME      = 'he071;
+parameter [15:0] KEY_DEL_LINE      = 'he069;
+parameter [15:0] KEY_CLS_HOME      = 'he06c;
 parameter [15:0] KEY_TAB           = 'h0d;
 parameter [15:0] KEY_Q             = 'h15;
 parameter [15:0] KEY_W             = 'h1d;
@@ -85,7 +100,7 @@ parameter [15:0] KEY_L             = 'h4b;
 parameter [15:0] KEY_SEMICOLON     = 'h4c;
 parameter [15:0] KEY_QUOTE         = 'h52;
 parameter [15:0] KEY_BACK_QUOTE    = 'h5d;
-parameter [15:0] KEY_GRAPH         = 'h78;  // as f8
+parameter [15:0] KEY_GRAPH         = 'he07a;
 parameter [15:0] KEY_UP            = 'he075;
 parameter [15:0] KEY_SHIFT         = 'h12;  // also 59
 parameter [15:0] KEY_Z             = 'h1a;
@@ -98,7 +113,7 @@ parameter [15:0] KEY_M             = 'h3a;
 parameter [15:0] KEY_COMMA         = 'h41;
 parameter [15:0] KEY_DOT           = 'h49;
 parameter [15:0] KEY_SLASH         = 'h4a;
-parameter [15:0] KEY_MU            = 'h00;   // ??
+parameter [15:0] KEY_MU            = 'he07d;   
 parameter [15:0] KEY_LEFT          = 'he06b;
 parameter [15:0] KEY_RIGHT         = 'he074;
 parameter [15:0] KEY_CAP_LOCK      = 'h58;
@@ -109,17 +124,29 @@ wire [7:0] byte;   // keyboard data byte, 0xE0 = extended key, 0xF0 release key
 wire valid;        // 1 = data byte contains valid keyboard data 
 wire error;        // not used here
 
-reg key_released;
+reg key_status;
 reg key_extended;
 
-wire key_pressed = !key_released;
+wire [15:0] key = { (key_extended ? 8'he0 : 8'h00) , byte };
 
 always @(posedge clk) begin
-	if(reset) begin
-		//keys <= 8'h00;
-      key_released <= 1'b0;
+	if(reset) begin		
+      key_status <= 1'b1;
       key_extended <= 1'b0;
-	end else begin
+		KM[ 0] <= 7'b1111111;
+		KM[ 1] <= 7'b1111111;
+		KM[ 2] <= 7'b1111111;
+		KM[ 3] <= 7'b1111111;
+		KM[ 4] <= 7'b1111111;
+		KM[ 5] <= 7'b1111111;
+		KM[ 6] <= 7'b1111111;
+		KM[ 7] <= 7'b1111111;
+		KM[ 8] <= 7'b1111111;
+		KM[ 9] <= 7'b1111111;
+		KM[10] <= 7'b1111111;
+		KM[11] <= 7'b1111111;		
+	end 
+	else begin
 		// ps2 decoder has received a valid byte
 		if(valid) begin
 			if(byte == 8'he0) 
@@ -127,92 +154,93 @@ always @(posedge clk) begin
             key_extended <= 1'b1;
          else if(byte == 8'hf0)
 				// release code
-            key_released <= 1'b1;
+            key_status <= 1'b1;
          else begin
+			   // key press
 				key_extended <= 1'b0;
-				key_released <= 1'b0;
+				key_status   <= 1'b0;
 				
-				case(byte)					
-
-					KEY_SHIFT        : begin KA['h0] <= key_pressed; KD[6] <= key_pressed; end
-					KEY_Z            : begin KA['h0] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_X            : begin KA['h0] <= key_pressed; KD[4] <= key_pressed; end 
-					KEY_C            : begin KA['h0] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_V            : begin KA['h0] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_B            : begin KA['h0] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_N            : begin KA['h0] <= key_pressed; KD[0] <= key_pressed; end 
-					KEY_CONTROL      : begin KA['h1] <= key_pressed; KD[6] <= key_pressed; end
-					KEY_A            : begin KA['h1] <= key_pressed; KD[5] <= key_pressed; end   
-					KEY_S            : begin KA['h1] <= key_pressed; KD[4] <= key_pressed; end   
-					KEY_D            : begin KA['h1] <= key_pressed; KD[3] <= key_pressed; end   
-					KEY_F            : begin KA['h1] <= key_pressed; KD[2] <= key_pressed; end   
-					KEY_G            : begin KA['h1] <= key_pressed; KD[1] <= key_pressed; end   
-					KEY_H            : begin KA['h1] <= key_pressed; KD[0] <= key_pressed; end   
-					KEY_TAB          : begin KA['h2] <= key_pressed; KD[6] <= key_pressed; end
-					KEY_Q            : begin KA['h2] <= key_pressed; KD[5] <= key_pressed; end      
-					KEY_W            : begin KA['h2] <= key_pressed; KD[4] <= key_pressed; end      
-					KEY_E            : begin KA['h2] <= key_pressed; KD[3] <= key_pressed; end      
-					KEY_R            : begin KA['h2] <= key_pressed; KD[2] <= key_pressed; end      
-					KEY_T            : begin KA['h2] <= key_pressed; KD[1] <= key_pressed; end      
-					KEY_Y            : begin KA['h2] <= key_pressed; KD[0] <= key_pressed; end      
-					KEY_ESC          : begin KA['h3] <= key_pressed; KD[6] <= key_pressed; end
-					KEY_1            : begin KA['h3] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_2            : begin KA['h3] <= key_pressed; KD[4] <= key_pressed; end 
-					KEY_3            : begin KA['h3] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_4            : begin KA['h3] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_5            : begin KA['h3] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_6            : begin KA['h3] <= key_pressed; KD[0] <= key_pressed; end 
-					KEY_EQUAL        : begin KA['h4] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_MINUS        : begin KA['h4] <= key_pressed; KD[4] <= key_pressed; end 
-					KEY_0            : begin KA['h4] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_9            : begin KA['h4] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_8            : begin KA['h4] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_7            : begin KA['h4] <= key_pressed; KD[0] <= key_pressed; end 
-					KEY_BS           : begin KA['h5] <= key_pressed; KD[6] <= key_pressed; end 
-					KEY_P            : begin KA['h5] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_O            : begin KA['h5] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_I            : begin KA['h5] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_U            : begin KA['h5] <= key_pressed; KD[0] <= key_pressed; end 
-					KEY_RETURN       : begin KA['h6] <= key_pressed; KD[6] <= key_pressed; end                        
-					KEY_QUOTE        : begin KA['h6] <= key_pressed; KD[4] <= key_pressed; end
-					KEY_SEMICOLON    : begin KA['h6] <= key_pressed; KD[3] <= key_pressed; end
-					KEY_L            : begin KA['h6] <= key_pressed; KD[2] <= key_pressed; end
-					KEY_K            : begin KA['h6] <= key_pressed; KD[1] <= key_pressed; end
-					KEY_J            : begin KA['h6] <= key_pressed; KD[0] <= key_pressed; end                                                       
-					KEY_GRAPH        : begin KA['h7] <= key_pressed; KD[6] <= key_pressed; end 
-					KEY_BACK_QUOTE   : begin KA['h7] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_SPACE        : begin KA['h7] <= key_pressed; KD[4] <= key_pressed; end
-					KEY_SLASH        : begin KA['h7] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_DOT          : begin KA['h7] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_COMMA        : begin KA['h7] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_M            : begin KA['h7] <= key_pressed; KD[0] <= key_pressed; end 
-					KEY_BACKSLASH    : begin KA['h8] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_CLOSE_BRACKET: begin KA['h8] <= key_pressed; KD[4] <= key_pressed; end 
-					KEY_OPEN_BRACKET : begin KA['h8] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_MU           : begin KA['h8] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_DEL          : begin KA['h8] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_INS          : begin KA['h8] <= key_pressed; KD[0] <= key_pressed; end  
-					KEY_CAP_LOCK     : begin KA['h9] <= key_pressed; KD[6] <= key_pressed; end 
-					KEY_DEL_LINE     : begin KA['h9] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_CLS_HOME     : begin KA['h9] <= key_pressed; KD[4] <= key_pressed; end 
-					KEY_UP           : begin KA['h9] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_LEFT         : begin KA['h9] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_RIGHT        : begin KA['h9] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_DOWN         : begin KA['h9] <= key_pressed; KD[0] <= key_pressed; end 
-					KEY_F1           : begin KA['hA] <= key_pressed; KD[5] <= key_pressed; end 
-					KEY_F2           : begin KA['hA] <= key_pressed; KD[4] <= key_pressed; end 
-					KEY_F3           : begin KA['hA] <= key_pressed; KD[3] <= key_pressed; end 
-					KEY_F4           : begin KA['hA] <= key_pressed; KD[2] <= key_pressed; end    
-					KEY_F10          : begin KA['hB] <= key_pressed; KD[5] <= key_pressed; end   
-					KEY_F9           : begin KA['hB] <= key_pressed; KD[4] <= key_pressed; end   
-					KEY_F8           : begin KA['hB] <= key_pressed; KD[3] <= key_pressed; end   
-					KEY_F7           : begin KA['hB] <= key_pressed; KD[2] <= key_pressed; end 
-					KEY_F6           : begin KA['hB] <= key_pressed; KD[1] <= key_pressed; end 
-					KEY_F5           : begin KA['hB] <= key_pressed; KD[0] <= key_pressed; end
-				
+				case(key)	
+               KEY_RESET        : begin reset_key <= ~key_status; end		
+					
+					KEY_SHIFT        : begin KM['h0][6] <= key_status; end
+					KEY_Z            : begin KM['h0][5] <= key_status; end 
+					KEY_X            : begin KM['h0][4] <= key_status; end 
+					KEY_C            : begin KM['h0][3] <= key_status; end 
+					KEY_V            : begin KM['h0][2] <= key_status; end 
+					KEY_B            : begin KM['h0][1] <= key_status; end 
+					KEY_N            : begin KM['h0][0] <= key_status; end 
+					KEY_CONTROL      : begin KM['h1][6] <= key_status; end
+					KEY_A            : begin KM['h1][5] <= key_status; end   
+					KEY_S            : begin KM['h1][4] <= key_status; end   
+					KEY_D            : begin KM['h1][3] <= key_status; end   
+					KEY_F            : begin KM['h1][2] <= key_status; end   
+					KEY_G            : begin KM['h1][1] <= key_status; end   
+					KEY_H            : begin KM['h1][0] <= key_status; end   
+					KEY_TAB          : begin KM['h2][6] <= key_status; end
+					KEY_Q            : begin KM['h2][5] <= key_status; end      
+					KEY_W            : begin KM['h2][4] <= key_status; end      
+					KEY_E            : begin KM['h2][3] <= key_status; end      
+					KEY_R            : begin KM['h2][2] <= key_status; end      
+					KEY_T            : begin KM['h2][1] <= key_status; end      
+					KEY_Y            : begin KM['h2][0] <= key_status; end      
+					KEY_ESC          : begin KM['h3][6] <= key_status; end
+					KEY_1            : begin KM['h3][5] <= key_status; end 
+					KEY_2            : begin KM['h3][4] <= key_status; end 
+					KEY_3            : begin KM['h3][3] <= key_status; end 
+					KEY_4            : begin KM['h3][2] <= key_status; end 
+					KEY_5            : begin KM['h3][1] <= key_status; end 
+					KEY_6            : begin KM['h3][0] <= key_status; end 
+					KEY_EQUAL        : begin KM['h4][5] <= key_status; end 
+					KEY_MINUS        : begin KM['h4][4] <= key_status; end 
+					KEY_0            : begin KM['h4][3] <= key_status; end 
+					KEY_9            : begin KM['h4][2] <= key_status; end 
+					KEY_8            : begin KM['h4][1] <= key_status; end 
+					KEY_7            : begin KM['h4][0] <= key_status; end 
+					KEY_BS           : begin KM['h5][6] <= key_status; end 
+					KEY_P            : begin KM['h5][3] <= key_status; end 
+					KEY_O            : begin KM['h5][2] <= key_status; end 
+					KEY_I            : begin KM['h5][1] <= key_status; end 
+					KEY_U            : begin KM['h5][0] <= key_status; end 
+					KEY_RETURN       : begin KM['h6][6] <= key_status; end                        
+					KEY_QUOTE        : begin KM['h6][4] <= key_status; end
+					KEY_SEMICOLON    : begin KM['h6][3] <= key_status; end
+					KEY_L            : begin KM['h6][2] <= key_status; end
+					KEY_K            : begin KM['h6][1] <= key_status; end
+					KEY_J            : begin KM['h6][0] <= key_status; end                                                       
+					KEY_GRAPH        : begin KM['h7][6] <= key_status; end 
+					KEY_BACK_QUOTE   : begin KM['h7][5] <= key_status; end 
+					KEY_SPACE        : begin KM['h7][4] <= key_status; end
+					KEY_SLASH        : begin KM['h7][3] <= key_status; end 
+					KEY_DOT          : begin KM['h7][2] <= key_status; end 
+					KEY_COMMA        : begin KM['h7][1] <= key_status; end 
+					KEY_M            : begin KM['h7][0] <= key_status; end 
+					KEY_BACKSLASH    : begin KM['hb][5] <= key_status; end 
+					KEY_CLOSE_BRACKET: begin KM['hb][4] <= key_status; end 
+					KEY_OPEN_BRACKET : begin KM['hb][3] <= key_status; end 
+					KEY_MU           : begin KM['hb][2] <= key_status; end 
+					KEY_DEL          : begin KM['hb][1] <= key_status; end 
+					KEY_INS          : begin KM['hb][0] <= key_status; end  
+					KEY_CAP_LOCK     : begin KM['ha][6] <= key_status; end 
+					KEY_DEL_LINE     : begin KM['ha][5] <= key_status; end 
+					KEY_CLS_HOME     : begin KM['ha][4] <= key_status; end 
+					KEY_UP           : begin KM['ha][3] <= key_status; end 
+					KEY_LEFT         : begin KM['ha][2] <= key_status; end 
+					KEY_RIGHT        : begin KM['ha][1] <= key_status; end 
+					KEY_DOWN         : begin KM['ha][0] <= key_status; end 
+					KEY_F1           : begin KM['h8][5] <= key_status; end 
+					KEY_F2           : begin KM['h8][4] <= key_status; end 
+					KEY_F3           : begin KM['h8][3] <= key_status; end 
+					KEY_F4           : begin KM['h8][2] <= key_status; end    
+					KEY_F10          : begin KM['h9][5] <= key_status; end   
+					KEY_F9           : begin KM['h9][4] <= key_status; end   
+					KEY_F8           : begin KM['h9][3] <= key_status; end   
+					KEY_F7           : begin KM['h9][2] <= key_status; end 
+					KEY_F6           : begin KM['h9][1] <= key_status; end 
+					KEY_F5           : begin KM['h9][0] <= key_status; end				
 				endcase
 			end
-		end
+		end		
 	end
 end
 
@@ -231,6 +259,5 @@ ps2_intf ps2_keyboard (
 	.VALID	  ( valid  ),
 	.ERROR	  ( error  )
 );
-
 
 endmodule

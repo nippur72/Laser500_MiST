@@ -49,21 +49,21 @@ module laser500_mist
 localparam CONF_STR = {
 	"LASER500;;", // must be UPPERCASE        
 	"O1,Scanlines,On,Off;",
-	"T2,Reset"
+	"T0,Reset"
 };
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
 wire [7:0] status;       // the status register is controlled by the user_io module
 
-wire st_poweron  = status[0];
+wire st_reset = /*st_poweron  =*/ status[0];
 wire st_scalines = status[1];
-wire st_reset    = status[2];
+wire st_xreset    = status[2];
 
 // on screen display
 
 osd osd (
-   .clk_sys    ( F14M         ),
+   .clk_sys    ( F14M         ),	
 
    // spi for OSD
    .SPI_DI     ( SPI_DI       ),
@@ -84,6 +84,38 @@ osd osd (
 wire [7:0] joystick_0;
 wire [7:0] joystick_1;
 
+user_io #
+(
+	.STRLEN(CONF_STR_LEN),
+	.PS2DIV(100)
+)
+user_io ( 
+	.conf_str   ( CONF_STR   ),
+
+	.SPI_CLK    ( SPI_SCK    ),
+	.SPI_SS_IO  ( CONF_DATA0 ),
+	.SPI_MISO   ( SPI_DO     ),
+	.SPI_MOSI   ( SPI_DI     ),
+
+	.status     ( status     ),
+	
+	.clk_sys    ( F14M ),
+	.clk_sd     ( F14M ),
+	 
+	// ps2 interface
+	.ps2_kbd_clk    ( ps2_kbd_clk    ),
+	.ps2_kbd_data   ( ps2_kbd_data   ),
+	
+	/*
+	.ps2_mouse_clk  ( ps2_mouse_clk  ),
+	.ps2_mouse_data ( ps2_mouse_data ),
+	*/ 
+	
+	.joystick_0 ( joystick_0 ),
+	.joystick_1 ( joystick_1 )
+);
+
+/*
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
 	.conf_str   ( CONF_STR   ),
@@ -105,20 +137,23 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
 	.joystick_0 ( joystick_0 ),
 	.joystick_1 ( joystick_1 )
 );
+*/
 
 // the MiST emulates a PS2 keyboard and mouse
 
+/*
 // 15kHz ps2 clock from 14Mhz  clock
-wire ps2_clock = xclk_div[12];
-reg [12:0] xclk_div;
+wire ps2_clock = xclk_div[13];
+reg [13:0] xclk_div;
 always @(posedge F14M)
         xclk_div <= xclk_div + 14'd1;
+*/
 		  
 wire ps2_kbd_clk;
 wire ps2_kbd_data;
 
-wire [10:0] KA_n;
-wire [ 6:0] KD_n;
+wire [ 6:0] KD;
+wire        reset_key;
 
 keyboard keyboard 
 (
@@ -128,10 +163,12 @@ keyboard keyboard
 	.ps2_clk  ( ps2_kbd_clk  ),
 	.ps2_data ( ps2_kbd_data ),
 	
-	.KD_n     ( KD_n ),
-	.KA_n     ( KA_n ) 
+	.address  ( cpu_addr  ),
+	.KD       ( KD        ),
+	.reset_key( reset_key ),
+	
+	.debug    ( debug     )
 );
-
 		 
 //
 // data_io
@@ -152,11 +189,35 @@ data_io data_io (
 	.downloading ( dio_download ),  // signal indicating an active rom download
 	         
    // external ram interface
-   .clk   ( F3M       ),
+   .clk   ( F14M      ),
    .wr    ( dio_write ),
    .addr  ( dio_addr  ),
    .data  ( dio_data  )
 );
+
+/*
+scandoubler scandoubler (
+	.clk_sys( F14M ),
+
+	
+	// scanlines (00-none 01-25% 10-50% 11-75%)
+	//input      [1:0] scanlines,
+	//input            ce_x1,
+	//input            ce_x2,
+		
+	.hs_in ( video_hs ),
+	.vs_in ( video_vs ),
+	.r_in  ( osd_r_out ),
+	.g_in  ( osd_g_out ),
+	.b_in  ( osd_b_out ),
+	
+	.hs_out( scandoubler_hs_out ),
+	.vs_out( scandoubler_vs_out ),
+	.r_out ( scandoubler_r_out  ),
+	.g_out ( scandoubler_r_out  ),
+	.b_out ( scandoubler_r_out  )
+);
+*/
 	
 /******************************************************************************************/
 /******************************************************************************************/
@@ -187,8 +248,17 @@ wire        cpu_iorq_n;
 
 
 // include Z80 CPU
-T80se T80se (
-	.RESET_n  ( ~RESET        ),   // RESET
+T80se 
+/*
+#( 
+  .Mode(0),     // : integer := 0;	-- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
+  .T2Write(0),  // : integer := 0;	-- 0 => WR_n active in T3, /=0 => WR_n active in T2
+  .IOWait(0)    // : integer := 0	-- 0 => Single cycle I/O, 1 => Std I/O cycle
+) 
+*/
+T80se 
+(
+	.RESET_n  ( ~(RESET | reset_key) ),   // RESET
 	.CLK_n    ( ~F14M         ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
 	.CLKEN    ( CPUENA        ),   // CPU enable
 	.WAIT_n   ( ~RESET        ),   // WAIT (TODO implement wait states?)
@@ -196,7 +266,7 @@ T80se T80se (
 	.NMI_n    ( 1'b1          ),   // connected to VCC on the Laser 500
 	.BUSRQ_n  ( 1'b1          ),   // connected to VCC on the Laser 500
 	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
-	.M1_n     ( cpu_m1_n      ),   // M1==0 && MREQ==0 cpu is fetching, M1==0 && IORQ==0 ack interrupt
+	.M1_n     ( 1'b1          ),   // connected to expansion port on the Laser 500
 	.IORQ_n   ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
 	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
 	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
@@ -204,7 +274,6 @@ T80se T80se (
 	.DI       ( cpu_din       ),   // 8 bit data bus (input)
 	.DO       ( cpu_dout      )    // 8 bit data bus (output)
 );
-
 
 
 /******************************************************************************************/
@@ -268,10 +337,10 @@ VTL_chip VTL_chip
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
 	.sdram_dout   ( sdram_dout       ), 
-	
-	// keyboard
-	.KA_n         ( KA_n ),
-	.KD_n         ( KD_n )
+		
+	.KD           ( KD     ),	
+	.BUZZER       ( BUZZER ),
+	.CASOUT       ( CASOUT )
 );
 
 // TODO add scandoubler
@@ -325,11 +394,14 @@ always @(posedge F14M) begin
 end
 
 
+wire debug;
+
+/*
 // debug keyboard on the LED
 always @(posedge F14M) begin
-	if(!RESET) LED_ON <= ~KA_n['h0];
+	if(!RESET) LED_ON <= debug;
 end
-
+*/
 
 /******************************************************************************************/
 /******************************************************************************************/
@@ -341,66 +413,9 @@ end
 /******************************************************************************************/
 /******************************************************************************************/
 
-//
-// RAM tester
-//
-reg [63:0] long_counter;
 reg LED_ON = 0;
-
 assign LED = ~LED_ON;
 
-/*
-always @(posedge F3M) begin
-	LED_ON <= 1;
-	if(dio_download == 1 && LED_ON == 1) LED_ON <= 0;
-end
-*/
-
-/*
-reg [24:0] test_addr;
-reg        test_wr;
-reg        test_rd;
-wire [7:0] test_dout;
-reg  [7:0] test_din;
-
-always @(posedge F3M) begin
-	if(cpu_reset) begin
-		long_counter <= 0;
-	end else begin			
-		long_counter <= long_counter + 1;
-					
-		if(long_counter[23:0] == 0) begin
-			LED_ON <= 1;
-			test_rd <= 0;
-			test_wr <= 1;
-			test_addr <= 'h3800 | ('h7 << 14) ;
-			test_din <= 65;
-		end 
-		if(long_counter[23:0] == 200) begin
-			LED_ON <= 1;
-			test_rd <= 0;
-			test_wr <= 1;
-			test_addr <= 'h3801 | ('h7 << 14) ;
-			test_din <= 66;
-		end 
-		if(long_counter[23:0] == 400) begin
-			LED_ON <= 1;
-			test_rd <= 1;
-			test_wr <= 0;
-			test_addr <= 'h3801 | ('h7 << 14) ;			
-		end 
-		else if(long_counter[23:0] == 2097152) begin				
-			test_rd <= 1;
-			test_wr <= 0;
-			test_addr <= 0; //'h3800 | ('h7 << 14) ;				
-		end 
-		else if(long_counter[23:0] == 2097152+4) begin  
-			if(test_dout == 'hf3)	LED_ON <= 0;   // 65
-		end
-	end
-end
-*/
-	
 	
 //
 // RAM (SDRAM)
@@ -408,9 +423,8 @@ end
 						
 // SDRAM control signals
 wire ram_clock;
-assign SDRAM_CKE = 1'b1;
+assign SDRAM_CKE = pll_locked; // was: 1'b1;
 assign SDRAM_CLK = ram_clock;
-
 
 wire [24:0] sdram_addr ;
 wire        sdram_wr   ;
@@ -418,20 +432,12 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
-
 assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
 assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
 assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
-assign sdram_rd   = 1'b1; //dio_download ? 1'b1      : vdc_sdram_rd;
+assign sdram_rd   = dio_download ? 1'b1      : vdc_sdram_rd;
 
-
-/*
-assign sdram_din  = dio_download ? dio_data  : cpu_dout;
-assign sdram_addr = dio_download ? dio_addr  : { 9'd0, cpu_addr };
-assign sdram_wr   = dio_download ? dio_write : ~cpu_wr_n;
-assign sdram_rd   = dio_download ? 1'b1      : ~cpu_rd_n;
-*/
-
+// sdram from zx spectrum core	
 sdram sdram (
 	// interface to the MT48LC16M16 chip
    .sd_data        ( SDRAM_DQ                  ),
@@ -452,9 +458,43 @@ sdram sdram (
    .din            ( sdram_din                 ),
    .addr           ( sdram_addr                ),
    .we             ( sdram_wr                  ),
-   .oe         	 ( sdram_rd                  ),
+   .oe         	 ( sdram_rd                  ),	
    .dout           ( sdram_dout                )	
 );
-	
+
+
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** AUDIO ******************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+
+wire BUZZER;
+wire CASOUT;
+wire audio;
+
+dac #(.C_bits(8)) dac
+(
+	.clk_i   ( F14M   ),
+   .res_n_i ( ~RESET ),	
+	.dac_i   ( { BUZZER ^ CASOUT, 7'b0000000 } ),
+	.dac_o   ( audio )
+);
+
+always @(posedge F14M) begin
+	if(RESET) begin
+		AUDIO_L <= 0;
+		AUDIO_R <= 0;
+	end
+	else begin
+		AUDIO_L <= audio;
+		AUDIO_R <= audio;
+		LED_ON <= 1;
+	end
+end
 
 endmodule

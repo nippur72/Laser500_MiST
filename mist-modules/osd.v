@@ -27,15 +27,13 @@ module osd (
 	output [5:0] B_out
 );
 
-parameter OSD_X_OFFSET     = 10'd0;
-parameter OSD_Y_OFFSET     = 10'd0;
-parameter OSD_COLOR        = 3'd0;
-parameter OSD_AUTO_CE      = 1'b1;
+parameter OSD_X_OFFSET = 10'd0;
+parameter OSD_Y_OFFSET = 10'd0;
+parameter OSD_COLOR    = 3'd0;
+parameter OSD_AUTO_CE  = 1'b1;
 
-localparam OSD_WIDTH  = 10'd256;
-localparam OSD_HEIGHT = 10'd128;
-
-localparam OSD_WIDTH_PADDED = OSD_WIDTH + (OSD_WIDTH >> 1);  // 25% padding left and right
+localparam OSD_WIDTH   = 10'd256;
+localparam OSD_HEIGHT  = 10'd128;
 
 // *********************************************************************************
 // spi client
@@ -113,11 +111,9 @@ always @(posedge clk_sys) begin
 	auto_ce_pix <= !pixcnt;
 
 	if(hs && ~HSync) begin
-		cnt <= 0;	
-		     if(cnt <= OSD_WIDTH_PADDED * 2) pixsz = 0;  
-		else if(cnt <= OSD_WIDTH_PADDED * 3) pixsz = 1;  
-		else if(cnt <= OSD_WIDTH_PADDED * 4) pixsz = 2;  
-		else pixsz = 3;
+		cnt    <= 0;
+		if (cnt <= 512) pixsz = 0;
+		else pixsz  <= (cnt >> 9) - 1;
 		pixcnt <= 0;
 		auto_ce_pix <= 1;
 	end
