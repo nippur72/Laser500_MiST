@@ -4,6 +4,15 @@
 //
 // Derived from source code by Till Harbaum (c) 2015
 //
+
+// TODO fix sdram jitter problem
+// TODO right shift and control
+// TODO joysticks
+// TODO true cpu cycle
+// TODO laser 350/500/700 conf
+// TODO eng/ger/fra keyboard
+// TODO eng/ger/fra video rom
+// TODO fix GR 1 and GR 2
 									  
 module laser500_mist 
 ( 
