@@ -85,14 +85,8 @@ reg [3:0] vdc_border_color         = 10; // border color
 reg       vdc_page_7               = 0;  // 1=video RAM is in page 7 (Laser 500/700), 3 otherwise (Laser 350)
 
 // memory mapped I/O write registers 
-//reg io_bit_7                    ; // mapped to bit 7
 reg caps_lock_bit               ; // mapped to bit 6
-//reg io_bit_5                    ; // mapped to bit 5
-//reg io_bit_4                    ; // mapped to bit 4
 reg vdc_graphic_mode_enabled = 0; // mapped to bit 3
-//reg cassette_bit_out_l          ; // mapped to bit 1 
-
-
 
 
 // TODO use real 1bit colors
@@ -217,7 +211,6 @@ wire RD   = ~RD_n;
 wire IORQ = ~IORQ_n;
 
 always@(posedge F14M) begin
-
 	if(RESET) begin
 		hcnt <= 0;
 		vcnt <= 0;
@@ -227,7 +220,7 @@ always@(posedge F14M) begin
 		sdram_rd <= 0;
 		sdram_wr <= 0;
 		CASOUT <= 0;
-		BUZZER <= 0;
+		BUZZER <= 0;		
 	end
 	else begin	
 		if(clk_div == CYCLE_CPU_EXECUTE) 
@@ -320,8 +313,8 @@ always@(posedge F14M) begin
 				endcase				
 			end
 		end		
-   				
-		// counters
+   				      	
+		// counters 
 		if(hcnt == hsw+hbp+H+hfp-1) 
 		begin
 			hcnt <= 10'd0;
@@ -331,11 +324,11 @@ always@(posedge F14M) begin
 			end
 			else vcnt <= vcnt + 10'd1;
 				
-			if(vcnt === TOP_BORDER_WIDTH-1) ycnt <= 10'd0;
-			else                            ycnt <= ycnt + 10'd1;
+			if(vcnt == TOP_BORDER_WIDTH-1) ycnt <= 10'd0;
+			else                           ycnt <= ycnt + 10'd1;
 		end
 		else hcnt <= hcnt + 10'd1;
-      	
+
 		// draw pixel at hcnt,vcnt, graphic data contained in "char"
 		if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
 			pixel <= 0;   // blanking zone 
@@ -584,7 +577,7 @@ assign b =
 	wire  [3:0] bank          = banks[bank_bits];
 	wire  [1:0] bank_bits     = A[15:14];  
 	wire [13:0] base_addr     = A[13:0];	
-	wire        bank_is_ram   = bank == 3; //(bank >= 4 && bank <=7);  // TODO 350/700 ram config
+	wire        bank_is_ram   = bank >= 4 && bank <=7;  // TODO 350/700 ram config
 	wire        mapped_io     = bank == 2 && (base_addr >= 14'h2800 && base_addr <= 14'h2FFF);
 	
 	wire [24:0] videoAddress   = (vdc_page_7 == 1) ? { 7'd0, 4'h7, ramAddress } : { 7'd0, 4'h3, ramAddress };
