@@ -44,6 +44,7 @@ assign debug = KM[0][0];
 reg [6:0] KM [11:0]; 
 
 parameter [15:0] KEY_RESET         = 'h77; // as pause/break key -- not mapped on the I/O but directly on the /RES line to the CPU
+parameter [15:0] KEY_ALT_LEFT      = 'h11; // as pause/break key -- not mapped on the I/O but directly on the /RES line to the CPU
 parameter [15:0] KEY_F1            = 'h05;
 parameter [15:0] KEY_F2            = 'h06;
 parameter [15:0] KEY_F3            = 'h04;
@@ -67,6 +68,16 @@ parameter [15:0] KEY_7             = 'h3d;
 parameter [15:0] KEY_8             = 'h3e;
 parameter [15:0] KEY_9             = 'h46;
 parameter [15:0] KEY_0             = 'h45;
+parameter [15:0] KEY_1_NUMPAD      = 'h69;
+parameter [15:0] KEY_2_NUMPAD      = 'h72;
+parameter [15:0] KEY_3_NUMPAD      = 'h7a;
+parameter [15:0] KEY_4_NUMPAD      = 'h6b;
+parameter [15:0] KEY_5_NUMPAD      = 'h73;
+parameter [15:0] KEY_6_NUMPAD      = 'h74;
+parameter [15:0] KEY_7_NUMPAD      = 'h6c;
+parameter [15:0] KEY_8_NUMPAD      = 'h75;
+parameter [15:0] KEY_9_NUMPAD      = 'h7d;
+parameter [15:0] KEY_0_NUMPAD      = 'h70;
 parameter [15:0] KEY_MINUS         = 'h4e;
 parameter [15:0] KEY_EQUAL         = 'h55;
 parameter [15:0] KEY_BACKSLASH     = 'h0e;
@@ -87,7 +98,8 @@ parameter [15:0] KEY_P             = 'h4d;
 parameter [15:0] KEY_OPEN_BRACKET  = 'h54;
 parameter [15:0] KEY_CLOSE_BRACKET = 'h5b;
 parameter [15:0] KEY_RETURN        = 'h5a;
-parameter [15:0] KEY_CONTROL       = 'h14;  // other control is e014
+parameter [15:0] KEY_CONTROL       = 'h14;  
+parameter [15:0] KEY_CONTROL_RIGHT = 'he014; 
 parameter [15:0] KEY_A             = 'h1c;
 parameter [15:0] KEY_S             = 'h1b;
 parameter [15:0] KEY_D             = 'h23;
@@ -102,7 +114,8 @@ parameter [15:0] KEY_QUOTE         = 'h52;
 parameter [15:0] KEY_BACK_QUOTE    = 'h5d;
 parameter [15:0] KEY_GRAPH         = 'he07a;
 parameter [15:0] KEY_UP            = 'he075;
-parameter [15:0] KEY_SHIFT         = 'h12;  // also 59
+parameter [15:0] KEY_SHIFT         = 'h12;  
+parameter [15:0] KEY_SHIFT_RIGHT   = 'h59;  
 parameter [15:0] KEY_Z             = 'h1a;
 parameter [15:0] KEY_X             = 'h22;
 parameter [15:0] KEY_C             = 'h21;
@@ -119,6 +132,13 @@ parameter [15:0] KEY_RIGHT         = 'he074;
 parameter [15:0] KEY_CAP_LOCK      = 'h58;
 parameter [15:0] KEY_SPACE         = 'h29;
 parameter [15:0] KEY_DOWN          = 'he072;
+
+parameter [15:0] KEY_RETURN_NUMPAD = 'he05a;
+parameter [15:0] KEY_MINUS_NUMPAD  = 'h7b;
+parameter [15:0] KEY_PLUS_NUMPAD   = 'h79;
+parameter [15:0] KEY_MULT_NUMPAD   = 'h7c;
+parameter [15:0] KEY_SLASH_NUMPAD  = 'he04a;
+parameter [15:0] KEY_DOT_NUMPAD    = 'h71;
 
 wire [7:0] byte;   // keyboard data byte, 0xE0 = extended key, 0xF0 release key
 wire valid;        // 1 = data byte contains valid keyboard data 
@@ -161,9 +181,9 @@ always @(posedge clk) begin
 				key_status   <= 1'b0;
 				
 				case(key)	
-               KEY_RESET        : begin reset_key <= ~key_status; end		
-					
+               KEY_RESET        : begin reset_key <= ~key_status; end													
 					KEY_SHIFT        : begin KM['h0][6] <= key_status; end
+					KEY_SHIFT_RIGHT  : begin KM['h0][6] <= key_status; end
 					KEY_Z            : begin KM['h0][5] <= key_status; end 
 					KEY_X            : begin KM['h0][4] <= key_status; end 
 					KEY_C            : begin KM['h0][3] <= key_status; end 
@@ -171,6 +191,7 @@ always @(posedge clk) begin
 					KEY_B            : begin KM['h0][1] <= key_status; end 
 					KEY_N            : begin KM['h0][0] <= key_status; end 
 					KEY_CONTROL      : begin KM['h1][6] <= key_status; end
+					KEY_CONTROL_RIGHT: begin KM['h1][6] <= key_status; end
 					KEY_A            : begin KM['h1][5] <= key_status; end   
 					KEY_S            : begin KM['h1][4] <= key_status; end   
 					KEY_D            : begin KM['h1][3] <= key_status; end   
@@ -237,7 +258,25 @@ always @(posedge clk) begin
 					KEY_F8           : begin KM['h9][3] <= key_status; end   
 					KEY_F7           : begin KM['h9][2] <= key_status; end 
 					KEY_F6           : begin KM['h9][1] <= key_status; end 
-					KEY_F5           : begin KM['h9][0] <= key_status; end				
+					KEY_F5           : begin KM['h9][0] <= key_status; end
+	
+					// num pad
+					KEY_0_NUMPAD     : begin KM['h4][3] <= key_status; end 
+					KEY_1_NUMPAD     : begin KM['h3][5] <= key_status; end 
+					KEY_2_NUMPAD     : begin KM['h3][4] <= key_status; end 
+					KEY_3_NUMPAD     : begin KM['h3][3] <= key_status; end 
+					KEY_4_NUMPAD     : begin KM['h3][2] <= key_status; end 
+					KEY_5_NUMPAD     : begin KM['h3][1] <= key_status; end 
+					KEY_6_NUMPAD     : begin KM['h3][0] <= key_status; end 
+					KEY_7_NUMPAD     : begin KM['h4][0] <= key_status; end 
+					KEY_8_NUMPAD     : begin KM['h4][1] <= key_status; end 
+					KEY_9_NUMPAD     : begin KM['h4][2] <= key_status; end 									
+					KEY_RETURN_NUMPAD: begin KM['h6][6] <= key_status; end                        
+					KEY_MINUS_NUMPAD : begin KM['h4][4] <= key_status; end 
+					KEY_PLUS_NUMPAD  : begin KM['h4][5] <= key_status; KM['h0][6] <= key_status; end  // shift + "="
+					KEY_MULT_NUMPAD  : begin KM['h4][1] <= key_status; KM['h0][6] <= key_status; end  // shift + "8"
+					KEY_SLASH_NUMPAD : begin KM['h7][3] <= key_status; end 
+					KEY_DOT_NUMPAD   : begin KM['h7][2] <= key_status; end 	
 				endcase
 			end
 		end		

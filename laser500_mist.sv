@@ -6,7 +6,6 @@
 //
 
 // TODO fix sdram jitter problem
-// TODO right shift and control
 // TODO joysticks
 // TODO true cpu cycle
 // TODO laser 350/500/700 conf
