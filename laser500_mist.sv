@@ -5,6 +5,8 @@
 // Derived from source code by Till Harbaum (c) 2015
 //
 
+// TODO VTL simplyfly row/col increment logic
+// TODO convert VTL in clocked logic
 // TODO fix sdram jitter problem
 // TODO joysticks
 // TODO true cpu cycle
@@ -12,7 +14,9 @@
 // TODO eng/ger/fra keyboard
 // TODO eng/ger/fra video rom
 // TODO fix GR 1 and GR 2
-									  
+// TODO add scandoubler
+// TODO memory init/power off?	
+								   
 module laser500_mist 
 ( 
    input [1:0] 	CLOCK_27,      // 27 MHz board clock 
@@ -197,7 +201,7 @@ data_io data_io (
 	.downloading ( dio_download ),  // signal indicating an active rom download
 	         
    // external ram interface
-   .clk   ( F14M      ),
+   .clk   ( F3M      ),
    .wr    ( dio_write ),
    .addr  ( dio_addr  ),
    .data  ( dio_data  )
@@ -244,7 +248,7 @@ scandoubler scandoubler (
 // CPU control signals
 wire        CPUCK;          // CPU Clock not used yet
 wire        CPUENA;         // CPU enable
-wire        WAIT_n;         // CPU WAIT (not implemented)
+wire        WAIT_n;         // CPU WAIT 
 wire [15:0] cpu_addr;
 wire [7:0]  cpu_din;
 wire [7:0]  cpu_dout;
