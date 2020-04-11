@@ -157,7 +157,8 @@ assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_gr
 // calculate x offset (TODO replace with hcnt or clk_div?)
 assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
 
-wire [2:0] clk_div = hcnt[2:0];   // clock divider and bus slot assignment
+wire [2:0] clk_div = hcnt[2:0];       // clock divider and bus slot assignment
+wire [1:0] CPU_div = hcnt[1:0];   // 
 
 assign CPUCK  = clk_div[1];   // derive CPUCK by dividing F14M by 4
 // warning: CPUCK not used, F14M is fed into T80
@@ -205,6 +206,7 @@ reg WAIT;
 assign WAIT_n = ~WAIT;
 
 reg MREQ_old;
+reg skip_beat;
 
 always@(posedge F14M) begin
 	if(RESET) begin
@@ -356,43 +358,53 @@ always@(posedge F14M) begin
       */
 		
 		// works with 118 MHz sdram clock
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       CPUENA <= 0; end 	//            VDC ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin                                                  CPUENA <= 1; end 	// CPU EX	  VDC ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;     CPUENA <= 0; end 	// RAM ACCESS
-		else if(clk_div == 2) begin                                                  CPUENA <= 0; end 	// CPU TRANSFER
-		else if(clk_div == 3) begin sdram_rd <= 0;                                   CPUENA <= 0; end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      					
-		else if(clk_div == 4) begin sdram_rd <= 1;                                   CPUENA <= 1; end 	// CPU EX
-		else if(clk_div == 5) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;     CPUENA <= 0; end 	// RAM ACCESS
-		else if(clk_div == 6) begin                                                  CPUENA <= 0; end 	// CPU TRANSFER
+		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       end 	// VDC ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
+		else if(clk_div == 0) begin                                                  end 	// VDC ram reading ended; VDC saves data into "ramData"; ROM reading starts
+		else if(clk_div == 1) begin                                                  end 	// 
+		else if(clk_div == 2) begin                                                  end 	// 
+		else if(clk_div == 3) begin sdram_rd <= 0;                                   end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      					
+		else if(clk_div == 4) begin sdram_rd <= 1;                                   end 	// 
+		else if(clk_div == 5) begin                                                  end 	// 
+		else if(clk_div == 6) begin                                                  end 	// 
 		
+		// === CPU cyles ===
+		// CPU_div == 0    CPU does 1 cycle
+		// CPU_div == 1    RAM is read or written according to MREQ, RD and WR
+		// CPU_div == 2    CPU samples bus / turns off write
+		// CPU_div == 3    nothing
+							
 		/*
 		// detect MREQ state changes
-		if(clk_div == 6 || clk_div == 2) MREQ_old <= MREQ;
-		
-		if(clk_div == 7 || clk_div == 3) begin
-			if(MREQ == 1 && MREQ_old == 0) CPUENA <= 0;
-			else CPUENA <= 1;			
-		end 
+		if(CPU_div == 3) begin
+			MREQ_old <= MREQ;
+			skip_beat <= 0;
+		end
 		*/
 		
-		// cpu read cyles
-		if(MREQ && RD) begin		
-			if(clk_div == 1 || clk_div == 5) begin
-			   // read
+		// T=0: CPU does one cycle
+		if(CPU_div == 0) begin
+			/*
+			if(MREQ_old == 0 && MREQ == 1) begin
+				CPUENA <= 0;
+				skip_beat <= 1;
 			end
-			if(clk_div == 2 || clk_div == 6) begin								
-				if(mapped_io) begin											
-					DI[7] <= cassette_bit_in;					
-					DI[6:0] <= KD;						      
-				end				
-				else 
-					DI <= sdram_dout; // read from RAM/ROM			
-			end
-		end
+			else begin
+				CPUENA <= 1;
+				skip_beat <= 0;			
+			end			
+			*/
+			CPUENA <= 1;
+			skip_beat <= 0;			
+		end			
+		else
+			CPUENA <= 0;
 
-		// write
-		if(MREQ && WR)	begin
-			if(clk_div == 1 || clk_div == 5) begin						
+		
+		// T=1: RAM is read or written	
+		if(CPU_div == 1) begin
+			sdram_rd <= 1; 
+			sdram_addr <= cpuReadAddress;
+			if(MREQ && WR && !skip_beat)	begin				
 				if(mapped_io) begin											
 					caps_lock_bit            <= DO[6];
 					vdc_graphic_mode_enabled <= DO[3];
@@ -402,16 +414,31 @@ always@(posedge F14M) begin
 				else begin
 					sdram_wr <= bank_is_ram;
 					sdram_din <= DO;  						
-				end
-		   end
-			if(clk_div == 2 || clk_div == 6) begin	
-				// terminate write
-				sdram_wr <= 0;  
-			end			
+				end		   
+			end
 		end
-															
-		// T=4: Z80 IO 
-		if((clk_div == 2 || clk_div == 6) && IORQ) begin
+
+		// T=2: CPU samples bus, written is stopped	
+		if(CPU_div == 2) begin
+			if(MREQ && !skip_beat) begin
+				if(RD) begin					
+					if(mapped_io) begin											
+						DI[7] <= cassette_bit_in;					
+						DI[6:0] <= KD;						      
+					end				
+					else 
+						DI <= sdram_dout; // read from RAM/ROM						
+				end			
+				if(WR)	begin
+					// terminate write
+					sdram_wr <= 0;  
+				end					
+			end
+		end
+		
+		
+		// T=2: Z80 IO 
+		if(CPU_div == 2 && IORQ && !skip_beat) begin
 			if(RD) begin
 				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
 				// TODO implement I/O read
