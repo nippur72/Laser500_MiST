@@ -177,9 +177,8 @@ keyboard keyboard
 	
 	.address  ( cpu_addr  ),
 	.KD       ( KD        ),
-	.reset_key( reset_key ),
+	.reset_key( reset_key )
 	
-	.debug    ( debug     )
 );
 		 
 //
@@ -201,7 +200,7 @@ data_io data_io (
 	.downloading ( dio_download ),  // signal indicating an active rom download
 	         
    // external ram interface
-   .clk   ( F3M      ),
+   .clk   ( F14M      ),
    .wr    ( dio_write ),
    .addr  ( dio_addr  ),
    .data  ( dio_data  )
@@ -347,10 +346,13 @@ VTL_chip VTL_chip
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
 	.sdram_dout   ( sdram_dout       ), 
-		
-	.KD           ( KD     ),	
-	.BUZZER       ( BUZZER ),
-	.CASOUT       ( CASOUT )
+
+	.debug    ( debug     ),
+	
+	.KD           ( KD      ),	
+	.BUZZER       ( BUZZER  ),
+	.CASOUT       ( CASOUT  ),
+	.CASIN        ( CASIN   )
 );
 
 // TODO add scandoubler
@@ -403,15 +405,13 @@ always @(posedge F14M) begin
 	st_resetD <= st_reset;
 end
 
-
 wire debug;
 
-/*
 // debug keyboard on the LED
 always @(posedge F14M) begin
 	if(!RESET) LED_ON <= debug;
 end
-*/
+
 
 /******************************************************************************************/
 /******************************************************************************************/
@@ -473,6 +473,19 @@ sdram sdram (
 );
 
 
+// latches cassette input
+
+reg CASIN;
+always @(posedge F14M) begin
+	if(RESET) begin
+		CASIN <= 0;
+	end
+	else begin
+		CASIN <= UART_RX;
+	end
+end
+
+
 /******************************************************************************************/
 /******************************************************************************************/
 /******************************************************************************************/
@@ -491,7 +504,7 @@ dac #(.C_bits(8)) dac
 (
 	.clk_i   ( F14M   ),
    .res_n_i ( ~RESET ),	
-	.dac_i   ( { BUZZER ^ CASOUT, 7'b0000000 } ),
+	.dac_i   ( { BUZZER ^ CASOUT ^ CASIN, 7'b0000000 } ),
 	.dac_o   ( audio )
 );
 
@@ -503,7 +516,6 @@ always @(posedge F14M) begin
 	else begin
 		AUDIO_L <= audio;
 		AUDIO_R <= audio;
-		LED_ON <= 1;
 	end
 end
 

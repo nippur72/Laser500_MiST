@@ -3,7 +3,7 @@
 
 module VTL_chip 
 (	
-	input    F14M,	           // pixel clock
+	input    F14M,	           // pixel clock 14.77873   (14688000 in laser500emu)
 	input    RESET,           // reset signal
 		
 	// cpu interface
@@ -20,7 +20,7 @@ module VTL_chip
 	
 	// keyboard 	
 	input [ 6:0] KD,  
-   input        cassette_bit_in,	
+   input        CASIN,	
 	
 	// sdram interface
 	output reg [24:0] sdram_addr, // sdram address  
@@ -38,6 +38,8 @@ module VTL_chip
 	
 	output reg BUZZER,
 	output reg CASOUT,  // mapped I/O bit 2  
+	
+	output reg debug,
 	
 	// other ports
 	input blank
@@ -154,20 +156,20 @@ assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number == 5 ?
 assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || vdc_text80_enabled ? vdc_text80_foreground : fgbg[7:4];
 assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || vdc_text80_enabled ? vdc_text80_background : fgbg[3:0];
 
-// calculate x offset (TODO replace with hcnt or clk_div?)
+// calculate x offset (TODO replace with hcnt or VDC_cnt?)
 assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
 
-wire [2:0] clk_div = hcnt[2:0];       // clock divider and bus slot assignment
-wire [1:0] CPU_div = hcnt[1:0];   // 
+wire [2:0] VDC_cnt = hcnt[2:0];       // clock divider and bus slot assignment
+wire [1:0] CPU_cnt = hcnt[1:0];   // 
 
-assign CPUCK  = clk_div[1];   // derive CPUCK by dividing F14M by 4
+assign CPUCK  = VDC_cnt[1];   // derive CPUCK by dividing F14M by 4
 // warning: CPUCK not used, F14M is fed into T80
 
 
-//wire   CV     = ~clk_div[2];  // CV=1 video owns bus, CV=0 CPU owns bus
+//wire   CV     = ~VDC_cnt[2];  // CV=1 video owns bus, CV=0 CPU owns bus
 
 /*
-Details of the state machine (T=clk_div):
+Details of the state machine (T=VDC_cnt):
  
 VIDEO T=0
 VIDEO T=1	
@@ -223,185 +225,43 @@ always@(posedge F14M) begin
 		MREQ_old <= 0;
 	end
 	else begin		   
-		// working set
-		
-		/*
-		     if(clk_div == 7) sdram_rd <= 1;	// ram reading starts (screen data); ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) sdram_rd <= 1;	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) sdram_rd <= 1;	// CPU executes; VDC reads ROM		 			
-		else if(clk_div == 2) sdram_rd <= 0;	// CPU reads memory	
-		else if(clk_div == 3) sdram_rd <= 1;	// CPU writes memory			 			
-		else if(clk_div == 4) sdram_rd <= 1;	// CPU write stopped			 			
-		else if(clk_div == 5) sdram_rd <= 0;	// empty	 			
-		else if(clk_div == 6) sdram_rd <= 1;	// empty		 			
-		
-		     if(clk_div == 7) sdram_addr <= videoAddress;					
-	   else if(clk_div == 0) sdram_addr <= 0; 
-      else if(clk_div == 1) sdram_addr <= cpuReadAddress;
-		else if(clk_div == 2) sdram_addr <= cpuReadAddress;
-		else if(clk_div == 3) sdram_addr <= cpuReadAddress;
-		else if(clk_div == 4) sdram_addr <= cpuReadAddress;
-		else if(clk_div == 5) sdram_addr <= 0;
-		else if(clk_div == 6) sdram_addr <= 0; 
-		
-		     if(clk_div == 7) CPUENA <= 0;					
-	   else if(clk_div == 0) CPUENA <= 0;
-      else if(clk_div == 1) CPUENA <= 1;
-		else if(clk_div == 2) CPUENA <= 0;
-		else if(clk_div == 3) CPUENA <= 0;
-		else if(clk_div == 4) CPUENA <= 0;
-		else if(clk_div == 5) CPUENA <= 0;
-		else if(clk_div == 6) CPUENA <= 0; 
-		*/
-
-		/*
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 0; end 	// ram reading starts (screen data); ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 1; end 	// CPU executes; VDC reads ROM		 			
-		else if(clk_div == 2) begin sdram_rd <= 0; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU writes memory			 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU write stopped			 			
-		else if(clk_div == 5) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// empty	 			
-		else if(clk_div == 6) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 			
-		*/
-		
-		/*
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 0; end 	// ram reading starts (screen data); ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 1; end 	// CPU executes; VDC reads ROM		 			
-		else if(clk_div == 2) begin sdram_rd <= 0; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU writes memory			 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// CPU ends write
-		else if(clk_div == 5) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// empty	 			
-		else if(clk_div == 6) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 			
-		*/
-		
-		/*
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 0; end 	// ram reading starts (screen data); ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 1; end 	// CPU executes; VDC reads ROM		 			
-		else if(clk_div == 2) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// CPU reads memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads/writes memory	<candidate>	 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// CPU ends write
-		else if(clk_div == 5) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// empty	 			
-		else if(clk_div == 6) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 			
-		*/
-		
-		/*
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 0; end 	// ram reading starts (screen data); ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 1; end 	// CPU executes; VDC reads ROM		 			
-		else if(clk_div == 2) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads/writes memory	<candidate>	 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// CPU ends write
-		else if(clk_div == 5) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// empty	 			
-		else if(clk_div == 6) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 			
-		*/
-		
-		/*
-		// works with 118 MHz sdram clock
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 1; end 	// CPU executes; ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// VDC reads ROM		 			
-		else if(clk_div == 2) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads or writes memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU end read (store)	or end write 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty
-		else if(clk_div == 5) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// ram refresh cycle	 			
-		else if(clk_div == 6) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 	
-		*/
-		
-		/*
-		// works with 118 MHz sdram clock
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 1; end 	// CPU executes; ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// VDC reads ROM		 			
-		else if(clk_div == 2) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads or writes memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU end read (store)	or end write 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty
-		else if(clk_div == 5) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram refresh cycle	 			
-		else if(clk_div == 6) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 	
-	   */
-		
-		/*
-		// works with 118 MHz sdram clock
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;     CPUENA <= 1; end 	// CPU executes; ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		//else if(clk_div == 0) begin /*sdram_rd <= 1; sdram_addr <= videoAddress;* / CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// 		 			
-		else if(clk_div == 2) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU reads or writes memory	
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;   CPUENA <= 0; end 	// CPU end read (store)	or end write 			
-		else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// empty
-		else if(clk_div == 5) begin sdram_rd <= 1; sdram_addr <= 0;                CPUENA <= 0; end 	// ram refresh cycle	 			
-		else if(clk_div == 6) begin sdram_rd <= 0; sdram_addr <= 0;                CPUENA <= 0; end 	// empty		 	
-      */
-		
 		
 		// works with 118 MHz sdram clock
-		//     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       CPUENA <= 1; end 	// CPU executes; ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		//else if(clk_div == 0) begin /*sdram_rd <= 1; sdram_addr <= videoAddress;*/   CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		//else if(clk_div == 1) begin sdram_rd <= 1; sdram_addr <= 0;                  CPUENA <= 0; end 	// 		 			
-		//else if(clk_div == 2) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;     CPUENA <= 0; end 	// CPU reads or writes memory	
-		//else if(clk_div == 3) begin /*sdram_rd <= 1; sdram_addr <= cpuReadAddress;*/ CPUENA <= 0; end 	// 
-		//else if(clk_div == 4) begin sdram_rd <= 1; sdram_addr <= 0;                  CPUENA <= 0; end 	// CPU end read (store)	or end write 			
-		//else if(clk_div == 5) begin sdram_rd <= 1; sdram_addr <= 0;                  CPUENA <= 0; end 	// ram refresh cycle	 			
-		//else if(clk_div == 6) begin sdram_rd <= 0; sdram_addr <= 0;                  CPUENA <= 0; end 	// 		 	
-
-	   /*
-		// works with 118 MHz sdram clock
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       CPUENA <= 1; end 	// CPU executes; ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin                                                  CPUENA <= 0; end 	// ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin                                                  CPUENA <= 0; end 	// 		 			
-		else if(clk_div == 2) begin                                                  CPUENA <= 0; end 	// 
-		else if(clk_div == 3) begin sdram_rd <= 1; sdram_addr <= cpuReadAddress;     CPUENA <= 0; end 	// CPU reads or writes memory	
-		else if(clk_div == 4) begin                                                  CPUENA <= 0; end 	// 
-		else if(clk_div == 5) begin                                                  CPUENA <= 0; end 	// CPU end read (store)	or end write 			
-		else if(clk_div == 6) begin sdram_rd <= 0;                                   CPUENA <= 0; end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      
-      */
-		
-		// works with 118 MHz sdram clock
-		     if(clk_div == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       end 	// VDC ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(clk_div == 0) begin                                                  end 	// VDC ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(clk_div == 1) begin                                                  end 	// 
-		else if(clk_div == 2) begin                                                  end 	// 
-		else if(clk_div == 3) begin sdram_rd <= 0;                                   end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      					
-		else if(clk_div == 4) begin sdram_rd <= 1;                                   end 	// 
-		else if(clk_div == 5) begin                                                  end 	// 
-		else if(clk_div == 6) begin                                                  end 	// 
+		     if(VDC_cnt == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       end 	// VDC ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
+		else if(VDC_cnt == 0) begin                                                  end 	// VDC ram reading ended; VDC saves data into "ramData"; ROM reading starts
+		else if(VDC_cnt == 1) begin                                                  end 	// 
+		else if(VDC_cnt == 2) begin                                                  end 	// 
+		else if(VDC_cnt == 3) begin sdram_rd <= 0;                                   end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      					
+		else if(VDC_cnt == 4) begin sdram_rd <= 1;                                   end 	// 
+		else if(VDC_cnt == 5) begin                                                  end 	// 
+		else if(VDC_cnt == 6) begin                                                  end 	// 
 		
 		// === CPU cyles ===
-		// CPU_div == 0    CPU does 1 cycle
-		// CPU_div == 1    RAM is read or written according to MREQ, RD and WR
-		// CPU_div == 2    CPU samples bus / turns off write
-		// CPU_div == 3    nothing
-							
-		/*
+		// CPU_cnt == 0    CPU does 1 cycle
+		// CPU_cnt == 1    RAM is read or written according to MREQ, RD and WR
+		// CPU_cnt == 2    CPU samples bus / turns off write
+		// CPU_cnt == 3    nothing
+									
 		// detect MREQ state changes
-		if(CPU_div == 3) begin
+		if(CPU_cnt == 3) begin
 			MREQ_old <= MREQ;
-			skip_beat <= 0;
+			if(MREQ_old == 0 && MREQ == 1) begin
+				skip_beat <= 1;
+				debug <= 1;
+			end
+			else skip_beat <= 0;
 		end
-		*/
 		
 		// T=0: CPU does one cycle
-		if(CPU_div == 0) begin
-			/*
-			if(MREQ_old == 0 && MREQ == 1) begin
-				CPUENA <= 0;
-				skip_beat <= 1;
-			end
-			else begin
-				CPUENA <= 1;
-				skip_beat <= 0;			
-			end			
-			*/
-			CPUENA <= 1;
-			skip_beat <= 0;			
+		if(CPU_cnt == 0) begin			
+			CPUENA <= !skip_beat;			
 		end			
 		else
 			CPUENA <= 0;
 
 		
 		// T=1: RAM is read or written	
-		if(CPU_div == 1) begin
+		if(CPU_cnt == 1) begin
 			sdram_rd <= 1; 
 			sdram_addr <= cpuReadAddress;
 			if(MREQ && WR && !skip_beat)	begin				
@@ -419,11 +279,11 @@ always@(posedge F14M) begin
 		end
 
 		// T=2: CPU samples bus, written is stopped	
-		if(CPU_div == 2) begin
+		if(CPU_cnt == 2) begin
 			if(MREQ && !skip_beat) begin
 				if(RD) begin					
 					if(mapped_io) begin											
-						DI[7] <= cassette_bit_in;					
+						DI[7] <= CASIN;					
 						DI[6:0] <= KD;						      
 					end				
 					else 
@@ -438,7 +298,7 @@ always@(posedge F14M) begin
 		
 		
 		// T=2: Z80 IO 
-		if(CPU_div == 2 && IORQ && !skip_beat) begin
+		if(CPU_cnt == 2 && IORQ && !skip_beat) begin
 			if(RD) begin
 				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
 				// TODO implement I/O read
