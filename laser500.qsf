@@ -159,6 +159,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_global_assignment -name SYSTEMVERILOG_FILE laser500_mist.sv
 set_global_assignment -name VERILOG_FILE "mist-modules/user_io.v"
 set_global_assignment -name VERILOG_FILE "mist-modules/scandoubler.v"
+set_global_assignment -name VERILOG_FILE downloader.v
 set_global_assignment -name VERILOG_FILE VTL_chip.v
 set_global_assignment -name VERILOG_FILE rom_charset.v
 set_global_assignment -name QIP_FILE rom_charset.qip

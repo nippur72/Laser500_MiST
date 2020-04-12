@@ -5,17 +5,30 @@
 // Derived from source code by Till Harbaum (c) 2015
 //
 
-// TODO VTL simplyfly row/col increment logic
-// TODO convert VTL in clocked logic
-// TODO fix sdram jitter problem
+
+// TODO update to data_io
+// TODO update to user_io
+// TODO update to osd
+
+// TODO load prg via OSD
+// TODO add scandoubler/scanlines
 // TODO joysticks
-// TODO true cpu cycle
+// TODO measure CPU frequency (once for all)
 // TODO laser 350/500/700 conf
 // TODO eng/ger/fra keyboard
 // TODO eng/ger/fra video rom
 // TODO fix GR 1 and GR 2
-// TODO add scandoubler
+// TODO tape sounds ON/OFF
+// TODO tap player
+// TODO power off
+
+// TODO disk emulation
+// TODO NTSC?
+
 // TODO memory init/power off?	
+// TODO VTL simplyfly row/col increment logic
+// TODO convert VTL in clocked logic
+// TODO fix sdram jitter problem
 								   
 module laser500_mist 
 ( 
@@ -59,7 +72,7 @@ module laser500_mist
 
 // menu configuration string passed to user_io
 localparam CONF_STR = {
-	"LASER500;;", // must be UPPERCASE        
+	"LASER500;PRG;", // must be UPPERCASE        
 	"O1,Scanlines,On,Off;",
 	"T0,Reset"
 };
@@ -93,8 +106,8 @@ osd osd (
    .B_out      ( VGA_B        )   
 );
        
-wire [7:0] joystick_0;
-wire [7:0] joystick_1;
+wire [31:0] joystick_0;
+wire [31:0] joystick_1;
 
 user_io #
 (
@@ -185,25 +198,26 @@ keyboard keyboard
 // data_io
 //
 
-wire        dio_download;
-wire [24:0] dio_addr;
-wire [7:0]  dio_data;
-wire        dio_write;
+wire        is_downloading;
+wire [24:0] download_addr;
+wire [7:0]  download_data;
+wire        download_wr;
 
-// include ROM download helper
-data_io data_io (
+
+// ROM download helper
+downloader downloader (
 	// io controller spi interface
    .sck	( SPI_SCK ),
    .ss	( SPI_SS2 ),
    .sdi	( SPI_DI  ),
 
-	.downloading ( dio_download ),  // signal indicating an active rom download
+	.downloading ( is_downloading  ),  // signal indicating an active rom download
 	         
    // external ram interface
-   .clk   ( F14M      ),
-   .wr    ( dio_write ),
-   .addr  ( dio_addr  ),
-   .data  ( dio_data  )
+   .clk   ( F14M          ),
+   .wr    ( download_wr   ),
+   .addr  ( download_addr ),
+   .data  ( download_data )
 );
 
 /*
@@ -270,7 +284,7 @@ T80se
 	.RESET_n  ( ~(RESET | reset_key) ),   // RESET
 	.CLK_n    ( ~F14M         ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
 	.CLKEN    ( CPUENA        ),   // CPU enable
-	.WAIT_n   ( ~RESET        ),   // WAIT (TODO implement wait states?)
+	.WAIT_n   ( WAIT_n        ),   // WAIT (TODO implement wait states?)
 	.INT_n    ( video_vs      ),   // VSYNC interrupt
 	.NMI_n    ( 1'b1          ),   // connected to VCC on the Laser 500
 	.BUSRQ_n  ( 1'b1          ),   // connected to VCC on the Laser 500
@@ -317,7 +331,7 @@ VTL_chip VTL_chip
 (	
 	.RESET  ( RESET       ),
 	.F14M   ( F14M        ),
-	.WAIT_n ( WAIT_n      ),   // wait state for the CPU (TODO to be implemented yet)
+	//.WAIT_n ( WAIT_n      ),   // wait state for the CPU (TODO to be implemented yet)
 	
 	// cpu
    .CPUCK    ( CPUCK         ),
@@ -338,7 +352,7 @@ VTL_chip VTL_chip
 	.b      ( video_b     ),
 	
 	// other inputs
-	.blank  ( dio_download ),
+	.blank  ( is_downloading ),
 
 	//	SDRAM interface
 	.sdram_addr   ( vdc_sdram_addr   ), 
@@ -442,10 +456,12 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
-assign sdram_din  = dio_download ? dio_data  : vdc_sdram_din;
-assign sdram_addr = dio_download ? dio_addr  : vdc_sdram_addr;
-assign sdram_wr   = dio_download ? dio_write : vdc_sdram_wr;
-assign sdram_rd   = dio_download ? 1'b1      : vdc_sdram_rd;
+assign sdram_din  = is_downloading ? download_data        : vdc_sdram_din;
+assign sdram_addr = is_downloading ? download_addr        : vdc_sdram_addr;
+assign sdram_wr   = is_downloading ? download_wr          : vdc_sdram_wr;
+assign sdram_rd   = is_downloading ? 1'b1                 : vdc_sdram_rd;
+
+assign WAIT_n = ~(is_downloading | RESET);
 
 // sdram from zx spectrum core	
 sdram sdram (
