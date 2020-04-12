@@ -137,40 +137,6 @@ user_io (
 	.joystick_0 ( joystick_0 ),
 	.joystick_1 ( joystick_1 )
 );
-
-/*
-// include user_io module for arm controller communication
-user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
-	.conf_str   ( CONF_STR   ),
-
-	.SPI_CLK    ( SPI_SCK    ),
-	.SPI_SS_IO  ( CONF_DATA0 ),
-	.SPI_MISO   ( SPI_DO     ),
-	.SPI_MOSI   ( SPI_DI     ),
-
-	.status     ( status     ),
-	 
-	// ps2 interface
-	.ps2_clk        ( ps2_clock      ),
-	.ps2_kbd_clk    ( ps2_kbd_clk    ),
-	.ps2_kbd_data   ( ps2_kbd_data   ),
-	.ps2_mouse_clk  ( ps2_mouse_clk  ),
-	.ps2_mouse_data ( ps2_mouse_data ),
-	 
-	.joystick_0 ( joystick_0 ),
-	.joystick_1 ( joystick_1 )
-);
-*/
-
-// the MiST emulates a PS2 keyboard and mouse
-
-/*
-// 15kHz ps2 clock from 14Mhz  clock
-wire ps2_clock = xclk_div[13];
-reg [13:0] xclk_div;
-always @(posedge F14M)
-        xclk_div <= xclk_div + 14'd1;
-*/
 		  
 wire ps2_kbd_clk;
 wire ps2_kbd_data;
@@ -204,12 +170,17 @@ wire        download_wr;
 
 // ROM download helper
 downloader downloader (
-	// io controller spi interface
-   .sck	( SPI_SCK ),
-   .ss	( SPI_SS2 ),
-   .sdi	( SPI_DI  ),
-
-	.downloading ( is_downloading  ),  // signal indicating an active rom download
+	
+	// new SPI interface
+   .SPI_DO ( SPI_DO  ),
+	.SPI_DI ( SPI_DI  ),
+   .SPI_SCK( SPI_SCK ),
+   .SPI_SS2( SPI_SS2 ),
+   .SPI_SS3( SPI_SS3 ),
+   .SPI_SS4( SPI_SS4 ),
+	
+	// signal indicating an active rom download
+	.downloading ( is_downloading  ),  
 	         
    // external ram interface
    .clk   ( F14M          ),

@@ -1,40 +1,42 @@
-// mem_read_word(0x83E9)-1;
+module downloader (	
 
-module downloader (
-	// io controller spi interface
-	input         sck,
-	input         ss,
-	input         sdi,
-
-	output reg    downloading,   // signal indicating an active download
-	 
-	// external ram interface
+	// new SPI interface
+   input SPI_DO,
+	input SPI_DI,
+   input SPI_SCK,
+   input SPI_SS2,
+   input SPI_SS3,
+   input SPI_SS4,
+	
 	input 			   clk,
+	output reg        downloading,   // signal indicating an active download
 	output reg        wr,
 	output reg [24:0] addr,
 	output reg [7:0]  data
 );
 
 wire        dio_dowloading;
-wire [4:0]  dio_index;
+wire [7:0]  dio_index;      
 wire        dio_wr;
 wire [24:0] dio_addr;
 wire [7:0]  dio_data;
 
 data_io data_io (
+	.clk_sys ( clk  ),
+	.clkref_n( 0    ),  // keep this to zero
+	
 	// io controller spi interface
-   .sck	( sck  ),
-   .ss	( ss   ),
-   .sdi	( sdi  ),
+	.SPI_SCK( SPI_SCK ),
+	.SPI_SS2( SPI_SS2 ),
+	.SPI_SS4( SPI_SS4 ),
+	.SPI_DI ( SPI_DI  ),
+	.SPI_DO ( SPI_DO  ), 	  
 
-	.downloading ( dio_dowloading ),  // signal indicating an active rom download
-	.index       ( dio_index      ),  // 0=rom download, 1=prg dowload
-	         
-   // external ram interface
-   .clk   ( clk      ),
-   .wr    ( dio_wr   ),
-   .addr  ( dio_addr ),
-   .data  ( dio_data )
+	.ioctl_download ( dio_dowloading ),  // signal indicating an active rom download
+	.ioctl_index    ( dio_index      ),  // 0=rom download, 1=prg dowload
+   .ioctl_wr       ( dio_wr         ),
+   .ioctl_addr     ( dio_addr       ),
+   .ioctl_dout     ( dio_data       )
 );
 
 reg dio_dowloading_old = 0;
