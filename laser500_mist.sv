@@ -5,9 +5,6 @@
 // Derived from source code by Till Harbaum (c) 2015
 //
 
-
-// TODO update to data_io
-
 // TODO load prg via OSD
 // TODO add scandoubler/scanlines
 // TODO joysticks
