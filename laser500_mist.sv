@@ -7,8 +7,6 @@
 
 
 // TODO update to data_io
-// TODO update to user_io
-// TODO update to osd
 
 // TODO load prg via OSD
 // TODO add scandoubler/scanlines
