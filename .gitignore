@@ -16,6 +16,7 @@ laser500.map.*
 laser500.qws
 PLLJ_PLLSPE_INFO.txt
 *.bak
-*.rbf
+laser500.rbf
 greybox_tmp/
 *.ddb
+
