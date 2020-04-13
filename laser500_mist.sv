@@ -4,20 +4,25 @@
 //
 // Derived from source code by Till Harbaum (c) 2015
 //
-
-// TODO load prg via OSD
-// TODO add scandoubler/scanlines
+// TODO check T80 with https://github.com/sorgelig/Amstrad_MiST
+// TODO invert tape output
+// TODO add LP filter to tape out
 // TODO joysticks
 // TODO measure CPU frequency (once for all)
+// TODO fix GR 1 and GR 2
+// TODO add scandoubler/scanlines
 // TODO laser 350/500/700 conf
+// TODO check palette with real hardware
+// TODO check screen geometry with real hardware
 // TODO eng/ger/fra keyboard
 // TODO eng/ger/fra video rom
-// TODO fix GR 1 and GR 2
+// TODO true VGA resolution with frame buffer?
+// TODO disk emulation
+
 // TODO tape sounds ON/OFF
-// TODO tap player
+// TODO tap/wav player?
 // TODO power off
 
-// TODO disk emulation
 // TODO NTSC?
 
 // TODO memory init/power off?	
