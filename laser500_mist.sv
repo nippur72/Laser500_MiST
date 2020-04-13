@@ -4,11 +4,8 @@
 //
 // Derived from source code by Till Harbaum (c) 2015
 //
-// TODO check T80 with https://github.com/sorgelig/Amstrad_MiST
-// TODO invert tape output
-// TODO add LP filter to tape out
+// TODO add LP filter to tape out?
 // TODO joysticks
-// TODO measure CPU frequency (once for all)
 // TODO fix GR 1 and GR 2
 // TODO add scandoubler/scanlines
 // TODO laser 350/500/700 conf
@@ -493,22 +490,18 @@ wire BUZZER;
 wire CASOUT;
 wire audio;
 
+//
+// BUZZER for emulating the keyboard builtin speaker
+// CASIN for tape monitor
+// CASOUT for save to tape wire
+//
 dac #(.C_bits(16)) dac_AUDIO_L
 (
 	.clk_i   ( F14M   ),
    .res_n_i ( ~RESET ),	
-	.dac_i   ( CASOUT_LPF_out  ),
-	.dac_o   ( dac_AUDIO_L_out )
+	.dac_i   ( { BUZZER ^ CASIN ^ (~CASOUT), 15'b0000000 }  ),
+	.dac_o   ( audio )
 );
-
-dac #(.C_bits(16)) dac_AUDIO_R
-(
-	.clk_i   ( F14M   ),
-   .res_n_i ( ~RESET ),	
-	.dac_i   ( { BUZZER ^ CASIN, 15'b0000000 } ),
-	.dac_o   ( dac_AUDIO_R_out )
-);
-
 
 always @(posedge F14M) begin
 	if(RESET) begin
@@ -516,13 +509,14 @@ always @(posedge F14M) begin
 		AUDIO_R <= 0;
 	end
 	else begin
-		AUDIO_L <= dac_AUDIO_L_out;
-		AUDIO_R <= dac_AUDIO_R_out;
+		AUDIO_L <= audio;
+		AUDIO_R <= audio;
 	end
 end
 
 
-// CASOUT low pass filter
+/*
+// CASOUT low pass filter (disabled for now)
 
 wire [15:0] CASOUT_LPF_out;
 
@@ -543,6 +537,7 @@ CASOUT_LPF
 	.din_i   ( { CASOUT, 15'b0 } ),
 	.dout_o  ( CASOUT_LPF_out )
 );
+*/
 
 endmodule
 
