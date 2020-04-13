@@ -20,7 +20,9 @@ module VTL_chip
 	
 	// keyboard 	
 	input [ 6:0] KD,  
-   input        CASIN,	
+   input        CASIN,
+
+   input [31:0] joystick_0,
 	
 	// sdram interface
 	output reg [24:0] sdram_addr, // sdram address  
@@ -110,6 +112,7 @@ parameter cole = 12'hee6;  // bright yellow
 parameter colf = 12'hfff;  // white 
 */
 
+/*
 parameter col0 = 12'h000;  // black 
 parameter col1 = 12'h008;  // blue 
 parameter col2 = 12'h080;  // green 
@@ -120,11 +123,29 @@ parameter col6 = 12'h880;  // yellow
 parameter col7 = 12'h888;  // bright grey 
 parameter col8 = 12'h444;  // dark grey 
 parameter col9 = 12'h44f;  // bright blue 
-parameter cola = 12'h4f4;  // bright green 
+parameter cola = 12'h3f3;  // bright green 
 parameter colb = 12'h4ff;  // bright cyan 
 parameter colc = 12'hf44;  // bright red 
 parameter cold = 12'hf4f;  // bright magenta 
 parameter cole = 12'hff4;  // bright yellow 
+parameter colf = 12'hfff;  // white 
+*/
+
+parameter col0 = 12'h000;  // black 
+parameter col1 = 12'h00f;  // blue 
+parameter col2 = 12'h0a0;  // green 
+parameter col3 = 12'h08a;  // cyan 
+parameter col4 = 12'hf00;  // red 
+parameter col5 = 12'h808;  // magenta 
+parameter col6 = 12'h790;  // yellow 
+parameter col7 = 12'h888;  // bright grey 
+parameter col8 = 12'h666;  // dark grey 
+parameter col9 = 12'h66f;  // bright blue 
+parameter cola = 12'h6f6;  // bright green 
+parameter colb = 12'h6ff;  // bright cyan 
+parameter colc = 12'hf66;  // bright red 
+parameter cold = 12'hf6f;  // bright magenta 
+parameter cole = 12'hff6;  // bright yellow 
 parameter colf = 12'hfff;  // white 
 
 rom_charset rom_charset (
@@ -140,7 +161,7 @@ wire [3:0] bg;
 
 // generate negative hsync and vsync signals
 assign hsync = (hcnt < hsw) ? 0 : 1;
-assign vsync = (vcnt <   2) ? 0 : 1;
+assign vsync = (vcnt <   4) ? 0 : 1;
 
 // set row address loading colum
 assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number == 5 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
@@ -313,7 +334,18 @@ always@(posedge F14M) begin
 				//case 0x12:
 				//case 0x13:
 				//case 0x14:
-				//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;   					
+				//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;  
+/*
+up    = ~(inp(&h2b) &  1)
+down  = ~(inp(&h2b) &  2)
+left  = ~(inp(&h2b) &  4)
+right = ~(inp(&h2b) &  8)
+fire  = ~(inp(&h2b) & 16)
+fire2 = ~(inp(&h27) & 16)
+Hardware	right	left	down	up	btn 1	btn 2	btn 3	btn 4	btn 5	btn 6	btn 7	btn 8	btn 9	btn 10	btn 11	btn 12
+MiST	right	left	down	up	A	B	SELECT	START	X	Y	L	R	L2	R2	L3	R3
+Hex	0x01	0x02	0x04	0x08	0x10	0x20	0x40	0x80	0x100	0x200	0x400	0x800	0x1000	0x2000	0x4000	0x8000
+*/				
 			end
 			if(WR) begin
 				case(A[7:0])
