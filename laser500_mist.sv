@@ -238,30 +238,31 @@ wire        cpu_m1_n;
 wire        cpu_iorq_n;
 
 
-// include Z80 CPU
-T80se 
-#( 
-  .Mode(0),     // : integer := 0;	-- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
-  .T2Write(0),  // : integer := 0;	-- 0 => WR_n active in T3, /=0 => WR_n active in T2
-  .IOWait(0)    // : integer := 0	-- 0 => Single cycle I/O, 1 => Std I/O cycle
-) 
-T80se 
+t80pa cpu
 (
-	.RESET_n  ( ~(RESET | reset_key) ),   // RESET
-	.CLK_n    ( ~F14M         ),   // we use system clock (F14M & CPUENA in place of CPUCK); TODO is it negated?
-	.CLKEN    ( CPUENA        ),   // CPU enable
-	.WAIT_n   ( WAIT_n        ),   // WAIT (TODO implement wait states?)
-	.INT_n    ( video_vs      ),   // VSYNC interrupt
-	.NMI_n    ( 1'b1          ),   // connected to VCC on the Laser 500
-	.BUSRQ_n  ( 1'b1          ),   // connected to VCC on the Laser 500
-	.MREQ_n   ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
-	.M1_n     ( 1'b1          ),   // connected to expansion port on the Laser 500
-	.IORQ_n   ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
-	.RD_n     ( cpu_rd_n      ),   // READ       0=cpu reads
-	.WR_n     ( cpu_wr_n      ),   // WRITE      0=cpu writes
-	.A        ( cpu_addr      ),   // 16 bit address bus
-	.DI       ( cpu_din       ),   // 8 bit data bus (input)
-	.DO       ( cpu_dout      )    // 8 bit data bus (output)
+	.reset_n ( ~(RESET | reset_key) ),   // RESET
+	
+	.clk     ( F14M          ),   
+	.cen_p   ( CPUENA        ),   // CPU enable (positive edge)
+	.cen_n   ( ~CPUENA       ),   // CPU enable (negative edge)
+
+	.a       ( cpu_addr      ),   // 16 bit address bus
+	.DO      ( cpu_dout      ),   // 8 bit data bus (output)
+	.di      ( cpu_din       ),   // 8 bit data bus (input)
+	
+	.rd_n    ( cpu_rd_n      ),   // READ       0=cpu reads
+	.wr_n    ( cpu_wr_n      ),   // WRITE      0=cpu writes
+	
+	.iorq_n  ( cpu_iorq_n    ),   // IO REQUEST 0=read from I/O
+	.mreq_n  ( cpu_mreq_n    ),   // MEMORY REQUEST, idicates the bus has a valid memory address
+	.m1_n    ( 1'b1          ),   // connected to expansion port on the Laser 500
+	.rfsh_n  ( 1'b1          ),   // connected to expansion port on the Laser 500
+
+	.busrq_n ( 1'b1          ),   // connected to VCC on the Laser 500
+	.int_n   ( video_vs      ),   // VSYNC interrupt
+	.nmi_n   ( 1'b1          ),   // connected to VCC on the Laser 500
+	.wait_n  ( WAIT_n        ),   // 
+	
 );
 
 
