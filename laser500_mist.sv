@@ -240,6 +240,8 @@ wire        cpu_m1_n;
 wire        cpu_iorq_n;
 
 
+// this was taken from https://github.com/sorgelig/Amstrad_MiST by sorgelig
+
 t80pa cpu
 (
 	.reset_n ( ~(RESET | reset_key) ),   // RESET
