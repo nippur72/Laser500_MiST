@@ -365,6 +365,7 @@ pll pll (
 	 .c2     ( F3M           )         // F14M / 4 	 
 );
 
+localparam F14M_HZ = 14765625;
 
 // holds RESET=1 until 9,000,000 clock cycles so that pll is locked and ROM is downloaded
 
@@ -483,13 +484,22 @@ wire BUZZER;
 wire CASOUT;
 wire audio;
 
-dac #(.C_bits(8)) dac
+dac #(.C_bits(16)) dac_AUDIO_L
 (
 	.clk_i   ( F14M   ),
    .res_n_i ( ~RESET ),	
-	.dac_i   ( { BUZZER ^ CASOUT ^ CASIN, 7'b0000000 } ),
-	.dac_o   ( audio )
+	.dac_i   ( CASOUT_LPF_out  ),
+	.dac_o   ( dac_AUDIO_L_out )
 );
+
+dac #(.C_bits(16)) dac_AUDIO_R
+(
+	.clk_i   ( F14M   ),
+   .res_n_i ( ~RESET ),	
+	.dac_i   ( { BUZZER ^ CASIN, 15'b0000000 } ),
+	.dac_o   ( dac_AUDIO_R_out )
+);
+
 
 always @(posedge F14M) begin
 	if(RESET) begin
@@ -497,9 +507,34 @@ always @(posedge F14M) begin
 		AUDIO_R <= 0;
 	end
 	else begin
-		AUDIO_L <= audio;
-		AUDIO_R <= audio;
+		AUDIO_L <= dac_AUDIO_L_out;
+		AUDIO_R <= dac_AUDIO_R_out;
 	end
 end
 
+
+// CASOUT low pass filter
+
+wire [15:0] CASOUT_LPF_out;
+
+rc_filter_1o #(
+	//.highpass_g   ( 0       ),   // it's lowpass
+	.R_ohms_g     ( 1000    ),   // 1 KOhm
+	.C_p_farads_g ( 30000   ),   // 30nF    f0 = ~5Khz cutoff frequency
+	.fclk_hz_g    ( F14M_HZ ),   // value in HZ of the F14M pulse 
+	.cwidth_g     ( 14      ),   
+	.dwidthi_g    ( 16      ),   // 1 bit input resolution
+	.dwidtho_g    ( 16      )    // 16 bit output resolution
+)
+CASOUT_LPF
+(
+	.clk_i   ( F14M           ),
+	.clken_i ( 1              ),
+	.res_i   ( RESET          ),
+	.din_i   ( { CASOUT, 15'b0 } ),
+	.dout_o  ( CASOUT_LPF_out )
+);
+
 endmodule
+
+
