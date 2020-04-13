@@ -370,7 +370,12 @@ pll pll (
 	 .c2     ( F3M           )         // F14M / 4 	 
 );
 
-localparam F14M_HZ = 14765625;
+//
+// F14M = 14778730, F3M = 3694682, PAL=50.01 Hz according to user manual and schematic
+// F14M = 14698223, F3M = 3674555, PAL=49.74 Hz - by experimental measure on a real Laser 500 
+// F14M = 14700000, F3m = 3675000, PAL=49.75 Hz on the MiST due to PLL clock rounding
+//
+localparam F14M_HZ = 14700000;
 
 // holds RESET=1 until 9,000,000 clock cycles so that pll is locked and ROM is downloaded
 
