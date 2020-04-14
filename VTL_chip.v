@@ -268,10 +268,10 @@ always@(posedge F14M) begin
 		else if(VDC_cnt == 6) begin                                                  end 	// 
 		
 		// === CPU cyles ===
+		// CPU_cnt == 3    nothing
 		// CPU_cnt == 0    CPU does 1 cycle
 		// CPU_cnt == 1    RAM is read or written according to MREQ, RD and WR
 		// CPU_cnt == 2    CPU samples bus / turns off write
-		// CPU_cnt == 3    nothing
 									
 		// detect MREQ state changes
 		if(CPU_cnt == 3) begin
@@ -283,7 +283,7 @@ always@(posedge F14M) begin
 			else skip_beat <= 0;
 		end
 		
-		// T=0: CPU does one cycle
+		// CPU does one cycle
 		if(CPU_cnt == 0) begin			
 			CPUENA <= !skip_beat;			
 		end			
@@ -291,7 +291,7 @@ always@(posedge F14M) begin
 			CPUENA <= 0;
 
 		
-		// T=1: RAM is read or written	
+		// RAM is read or written	
 		if(CPU_cnt == 1) begin
 			sdram_rd <= 1; 
 			sdram_addr <= cpuReadAddress;
@@ -309,7 +309,7 @@ always@(posedge F14M) begin
 			end
 		end
 
-		// T=2: CPU samples bus, written is stopped	
+		// CPU samples bus, written is stopped	
 		if(CPU_cnt == 2) begin
 			if(MREQ && !skip_beat) begin
 				if(RD) begin					
@@ -328,7 +328,7 @@ always@(posedge F14M) begin
 		end
 		
 		
-		// T=2: Z80 IO 
+		// Z80 IO 
 		if(CPU_cnt == 2 && IORQ && !skip_beat) begin
 			if(RD) begin
 				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
