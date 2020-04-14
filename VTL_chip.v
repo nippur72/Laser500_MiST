@@ -196,39 +196,6 @@ wire [1:0] CPU_cnt = hcnt[1:0];   //
 assign CPUCK  = VDC_cnt[1];   // derive CPUCK by dividing F14M by 4
 // warning: CPUCK not used, F14M is fed into T80
 
-
-//wire   CV     = ~VDC_cnt[2];  // CV=1 video owns bus, CV=0 CPU owns bus
-
-/*
-Details of the state machine (T=VDC_cnt):
- 
-VIDEO T=0
-VIDEO T=1	
-VIDEO T=2
-VIDEO T=3  
-				finish video RAM read
-				starts charset ROM reading
-			   if cpu read/write put CPU in wait state and initiate read/write cpu RAM 
-            
-CPU   T=4
-CPU   T=5
-CPU   T=6
-CPU   T=7  
-				end charset ROM reading, start video RAM reading
-				if CPU wait state, finish cpu RAM read/write, release CPU wait, present data to cpu
-
-T=0 video ram reading starts 
-T=1 video ram is reading
-T=2 video ram reading completed
-T=3 nothing
-T=4 video ram data transfered into video register
-    charset rom reading starts
-    cpu ram reading starts 
-T=5 cpu reading
-T=6 cpu reading completed
-T=7 cpu transfer    				
-*/
-
 // negated signals (easier to read)
 wire MREQ   = ~MREQ_n;
 wire WR     = ~WR_n;
