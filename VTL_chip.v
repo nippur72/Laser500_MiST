@@ -66,6 +66,10 @@ parameter H                   = 798;  // width of visible area
 reg[9:0]   hcnt;          // horizontal pixel counter
 reg[9:0]   vcnt;          // vertical pixel counter
 wire[12:0] xcnt;          // active area x TODO, replace with hcnt?
+wire[12:0] xcnt1;         // active area x TODO, replace with hcnt?
+wire[12:0] xcnt2;         // active area x TODO, replace with hcnt?
+wire[12:0] xcnt3;         // active area x TODO, replace with hcnt?
+
 reg[9:0]   ycnt;          // active area y
 
 reg[7:0]  char;           // bitmap graphic data to display
@@ -154,7 +158,7 @@ rom_charset rom_charset (
 	.q(charsetQ)
 );							  						
 							  
-wire[9:0] load_column;    // column where the ramAddress is initialized, changes depending on the video mode
+// wire[9:0] load_column;    // column where the ramAddress is initialized, changes depending on the video mode
 
 wire [3:0] fg;
 wire [3:0] bg;
@@ -163,22 +167,28 @@ wire [3:0] bg;
 assign hsync = (hcnt < hsw) ? 0 : 1;
 assign vsync = (vcnt <   4) ? 0 : 1;
 
+/*
 // set row address loading colum
 assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number == 5 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
 						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 4 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(3*8)
 						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 3 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 2 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(3*8)
+						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 2 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
 						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 1 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(5*8)
 						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 0 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
 						  : vdc_text80_enabled ?                                       hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
 						  :                                                            hsw+hbp+LEFT_BORDER_WIDTH-1-(3*8);
+*/
 						  
 // calculate foreground and background colors						  
-assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || vdc_text80_enabled ? vdc_text80_foreground : fgbg[7:4];
-assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || vdc_text80_enabled ? vdc_text80_background : fgbg[3:0];
+assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || (!vdc_graphic_mode_enabled && vdc_text80_enabled) ? vdc_text80_foreground : fgbg[7:4];
+assign bg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || (!vdc_graphic_mode_enabled && vdc_text80_enabled) ? vdc_text80_background : fgbg[3:0];
 
 // calculate x offset (TODO replace with hcnt or VDC_cnt?)
 assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
+
+assign xcnt1 = xcnt + 8 +8; // text80, gr0, gr2, gr3, gr5             
+assign xcnt2 = xcnt + 16+8; // text40 and gr4
+assign xcnt3 = xcnt + 24+8; // gr1   
 
 wire [2:0] VDC_cnt = hcnt[2:0];       // clock divider and bus slot assignment
 wire [1:0] CPU_cnt = hcnt[1:0];   // 
@@ -468,6 +478,7 @@ Hex	0x01	0x02	0x04	0x08	0x10	0x20	0x40	0x80	0x100	0x200	0x400	0x800	0x1000	0x200
 			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra				
 		end		
 
+		/*
 		// calculate RAM address of character/byte and start reading video RAM
 		if(xcnt[2:0] == 7) begin 
 			
@@ -488,7 +499,7 @@ Hex	0x01	0x02	0x04	0x08	0x10	0x20	0x40	0x80	0x100	0x200	0x400	0x800	0x1000	0x200
 						ramAddress[ 4]  = ycnt[6];
 						ramAddress[3:0] = 0;
 					end else if(vdc_graphic_mode_number == 2 || vdc_graphic_mode_number == 1) begin
-						// GR 2            
+						// GR 2 and GR 1           
 						ramAddress[13]  = 1;
 						ramAddress[12]  = ycnt[2];
 						ramAddress[11]  = ycnt[1];
@@ -535,6 +546,80 @@ Hex	0x01	0x02	0x04	0x08	0x10	0x20	0x40	0x80	0x100	0x200	0x400	0x800	0x1000	0x200
 				ramAddress = ramAddress + 1;  
 			end 			
 		end
+		*/
+		
+		// calculate RAM address 					
+		if(vdc_graphic_mode_enabled) begin					
+			if(vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 4 || vdc_graphic_mode_number == 3) begin
+				// GR 5, GR 4, GR 3                                                               
+				ramAddress[13]  = ycnt[2];
+				ramAddress[12]  = ycnt[1];
+				ramAddress[11]  = ycnt[0];
+				ramAddress[10]  = ycnt[5];
+				ramAddress[ 9]  = ycnt[4];
+				ramAddress[ 8]  = ycnt[3];
+				ramAddress[ 7]  = ycnt[7];
+				ramAddress[ 6]  = ycnt[6];
+				ramAddress[ 5]  = ycnt[7];
+				ramAddress[ 4]  = ycnt[6];
+				ramAddress[3:0] = 0;
+				
+				     if(vdc_graphic_mode_number == 5) ramAddress = ramAddress + (xcnt1 >> 3);   
+				else if(vdc_graphic_mode_number == 4) ramAddress = ramAddress + (xcnt2 >> 3);   
+				else if(vdc_graphic_mode_number == 3) ramAddress = ramAddress + (xcnt1 >> 3);   
+
+			end else if(vdc_graphic_mode_number == 2 || vdc_graphic_mode_number == 1) begin
+				// GR 2 and GR 1           
+				ramAddress[13]  = 1;
+				ramAddress[12]  = ycnt[2];
+				ramAddress[11]  = ycnt[1];
+				ramAddress[10]  = ycnt[5];
+				ramAddress[ 9]  = ycnt[4];
+				ramAddress[ 8]  = ycnt[3];
+				ramAddress[ 7]  = ycnt[0];
+				ramAddress[ 6]  = ycnt[7];
+				ramAddress[ 5]  = ycnt[6];
+				ramAddress[ 4]  = ycnt[7];
+				ramAddress[ 3]  = ycnt[6];
+				ramAddress[2:0] = 0;
+				
+				     if(vdc_graphic_mode_number == 2) ramAddress = ramAddress + (xcnt1 >> 4);   
+				else if(vdc_graphic_mode_number == 1) ramAddress = ramAddress + (xcnt3 >> 4);   
+
+			end else if(vdc_graphic_mode_number == 0) begin
+				// GR 0            
+				ramAddress[13]  = 1;
+				ramAddress[12]  = ycnt[2];
+				ramAddress[11]  = ycnt[1];
+				ramAddress[10]  = ycnt[5];
+				ramAddress[ 9]  = ycnt[4];
+				ramAddress[ 8]  = ycnt[3];
+				ramAddress[ 7]  = ycnt[7];
+				ramAddress[ 6]  = ycnt[6];
+				ramAddress[ 5]  = ycnt[7];
+				ramAddress[ 4]  = ycnt[6];
+				ramAddress[3:0] = 0;
+				
+				ramAddress = ramAddress + (xcnt1 >> 3); 
+			end
+		end
+		else begin
+			// TEXT 80 and TEXT 40      
+			ramAddress[13]  = 1;
+			ramAddress[12]  = 1;
+			ramAddress[11]  = 1;         
+			ramAddress[10]  = ycnt[5];
+			ramAddress[ 9]  = ycnt[4];
+			ramAddress[ 8]  = ycnt[3];
+			ramAddress[ 7]  = ycnt[7];
+			ramAddress[ 6]  = ycnt[6];
+			ramAddress[ 5]  = ycnt[7];
+			ramAddress[ 4]  = ycnt[6];
+			ramAddress[3:0] = 0;
+			
+			     if(vdc_text80_enabled) ramAddress = ramAddress + (xcnt1 >> 3);   
+			else                        ramAddress = ramAddress + (xcnt2 >> 3);
+		end			
 			
 		// T=7 move saved latch to the pixel register 
 		if(vdc_graphic_mode_enabled) begin
