@@ -61,7 +61,7 @@ parameter LEFT_BORDER_WIDTH   =  72;  // left border
 parameter RIGHT_BORDER_WIDTH  =  86;  // right border
 parameter H                   = 798;  // width of visible area
 
-// 14778730 / (row_length * 312) =~49.7 => row_length = 952
+// F14M / (row_length * 312) = ~49.7 Hz
 
 reg[9:0]   hcnt;          // horizontal pixel counter
 reg[9:0]   vcnt;          // vertical pixel counter
