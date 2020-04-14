@@ -4,28 +4,26 @@
 //
 // Derived from source code by Till Harbaum (c) 2015
 //
-// TODO add LP filter to tape out?
-// TODO joysticks
+
+// TODO check horizontal line width 952 vs 947 dox pixels
 // TODO fix GR 1 and GR 2
+// TODO joysticks
 // TODO add scandoubler/scanlines
 // TODO laser 350/500/700 conf
-// TODO check palette with real hardware
-// TODO check screen geometry with real hardware
+// TODO disk emulation
 // TODO eng/ger/fra keyboard
 // TODO eng/ger/fra video rom
+// TODO power off
+// TODO check palette with real hardware
+// TODO check screen geometry with real hardware
 // TODO true VGA resolution with frame buffer?
-// TODO disk emulation
-
 // TODO tape sounds ON/OFF
 // TODO tap/wav player?
-// TODO power off
-
 // TODO NTSC?
-
-// TODO memory init/power off?	
 // TODO VTL simplyfly row/col increment logic
 // TODO convert VTL in clocked logic
 // TODO fix sdram jitter problem
+// TODO add LP filter to tape out?
 								   
 module laser500_mist 
 ( 
@@ -80,7 +78,7 @@ wire [7:0] status;       // the status register is controlled by the user_io mod
 
 wire st_reset = /*st_poweron  =*/ status[0];
 wire st_scalines = status[1];
-wire st_xreset    = status[2];
+wire st_xreset   = status[2];
 
 // on screen display
 
@@ -145,7 +143,7 @@ wire        reset_key;
 
 keyboard keyboard 
 (
-	.reset    ( RESET ),
+	.reset    ( !pll_locked ),
 	.clk      ( F14M  ),
 
 	.ps2_clk  ( ps2_kbd_clk  ),
@@ -153,8 +151,7 @@ keyboard keyboard
 	
 	.address  ( cpu_addr  ),
 	.KD       ( KD        ),
-	.reset_key( reset_key )
-	
+	.reset_key( reset_key )	
 );
 		 
 //
@@ -165,7 +162,7 @@ wire        is_downloading;
 wire [24:0] download_addr;
 wire [7:0]  download_data;
 wire        download_wr;
-
+wire        boot_completed;
 
 // ROM download helper
 downloader downloader (
@@ -179,7 +176,8 @@ downloader downloader (
    .SPI_SS4( SPI_SS4 ),
 	
 	// signal indicating an active rom download
-	.downloading ( is_downloading  ),  
+	.downloading ( is_downloading  ),
+   .ROM_done    ( boot_completed  ),	
 	         
    // external ram interface
    .clk   ( F14M          ),
@@ -265,7 +263,7 @@ t80pa cpu
 	.busrq_n ( 1'b1          ),   // connected to VCC on the Laser 500
 	.int_n   ( video_vs      ),   // VSYNC interrupt
 	.nmi_n   ( 1'b1          ),   // connected to VCC on the Laser 500
-	.wait_n  ( WAIT_n        ),   // 
+	.wait_n  ( WAIT_n        )    // 
 	
 );
 
@@ -332,7 +330,7 @@ VTL_chip VTL_chip
 	.sdram_wr     ( vdc_sdram_wr     ),
 	.sdram_dout   ( sdram_dout       ), 
 
-	.debug    ( debug     ),
+	.debug        ( debug   ),
 	
 	.KD           ( KD      ),	
 	.BUZZER       ( BUZZER  ),
@@ -376,21 +374,10 @@ pll pll (
 //
 localparam F14M_HZ = 14700000;
 
-// holds RESET=1 until 9,000,000 clock cycles so that pll is locked and ROM is downloaded
-
-wire RESET = (cpu_counter != 9000000);
-reg [64:0] cpu_counter = 0;
-always @(posedge F14M) begin
-	if(!pll_locked || reset_pressed) 
-		cpu_counter <= 0;			
-	else 
-		if(cpu_counter != 9000000)
-			cpu_counter <= cpu_counter + 1;
-end
-
+wire RESET = ~boot_completed | OSD_reset_pressed;
 
 // detects menu reset button press on the OSD menu
-wire reset_pressed = (st_reset == 1 && st_resetD == 0);
+wire OSD_reset_pressed = (st_reset == 1 && st_resetD == 0);
 reg st_resetD;
 always @(posedge F14M) begin
 	st_resetD <= st_reset;
@@ -400,7 +387,7 @@ wire debug;
 
 // debug keyboard on the LED
 always @(posedge F14M) begin
-	if(!RESET) LED_ON <= debug;
+	LED_ON <= debug;
 end
 
 
@@ -470,12 +457,7 @@ sdram sdram (
 
 reg CASIN;
 always @(posedge F14M) begin
-	if(RESET) begin
-		CASIN <= 0;
-	end
-	else begin
-		CASIN <= ~UART_RX;
-	end
+	CASIN <= ~UART_RX;
 end
 
 /******************************************************************************************/

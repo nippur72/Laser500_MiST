@@ -9,10 +9,12 @@ module downloader (
    input SPI_SS4,
 	
 	input 			   clk,
-	output reg        downloading,   // signal indicating an active download
 	output reg        wr,
 	output reg [24:0] addr,
-	output reg [7:0]  data
+	output reg [7:0]  data,
+
+	output reg        downloading,   // signal indicating an active download
+	output            ROM_done       // indicates the ROM has already been loaded at boot up
 );
 
 wire        dio_dowloading;
@@ -38,6 +40,10 @@ data_io data_io (
    .ioctl_addr     ( dio_addr       ),
    .ioctl_dout     ( dio_data       )
 );
+
+assign ROM_done = ROM_loaded;
+
+reg ROM_loaded = 0;
 
 reg dio_dowloading_old = 0;
 reg [2:0] cnt = 0;   
@@ -99,6 +105,7 @@ always @(posedge clk) begin
 			downloading <= 0;
 			wr          <= 0;
 			cnt         <= 0;
+			if(rom_download) ROM_loaded <= 1;
 		end
 	end	
 end
