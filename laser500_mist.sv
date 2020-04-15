@@ -6,23 +6,22 @@
 //
 
 // TODO check horizontal line width 952 vs 947 dox pixels
-// TODO fix GR 1 and GR 2
-// TODO joysticks
+// TODO check palette with real hardware
+// TODO check screen geometry with real hardware
+
+// TODO fix sdram jitter problem
+
 // TODO add scandoubler/scanlines
 // TODO laser 350/500/700 conf
+// TODO power off
+// TODO tape sounds ON/OFF
 // TODO disk emulation
 // TODO eng/ger/fra keyboard
 // TODO eng/ger/fra video rom
-// TODO power off
-// TODO check palette with real hardware
-// TODO check screen geometry with real hardware
+
 // TODO true VGA resolution with frame buffer?
-// TODO tape sounds ON/OFF
 // TODO tap/wav player?
 // TODO NTSC?
-// TODO VTL simplyfly row/col increment logic
-// TODO convert VTL in clocked logic
-// TODO fix sdram jitter problem
 // TODO add LP filter to tape out?
 								   
 module laser500_mist 
@@ -331,6 +330,9 @@ VTL_chip VTL_chip
 	.sdram_dout   ( sdram_dout       ), 
 
 	.debug        ( debug   ),
+	
+	.joystick_0   ( joystick_0 ),
+	.joystick_1   ( joystick_1 ),
 	
 	.KD           ( KD      ),	
 	.BUZZER       ( BUZZER  ),

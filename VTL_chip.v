@@ -23,6 +23,7 @@ module VTL_chip
    input        CASIN,
 
    input [31:0] joystick_0,
+	input [31:0] joystick_1,
 	
 	// sdram interface
 	output reg [24:0] sdram_addr, // sdram address  
@@ -297,32 +298,63 @@ always@(posedge F14M) begin
 		
 		// Z80 IO 
 		if(CPU_cnt == 2 && IORQ && !skip_beat) begin
-			if(RD) begin
-				DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
-				// TODO implement I/O read
-				//
-				//switch(port & 0xFF) {					
-				//case 0x2b: return joy0;  // joystick 8 directions
-				//case 0x27: return joy1;  // joystick fire buttons      
-				//case 0x00: return printerReady;                  
-				//case 0x2e: return 0x00;  // joystick 2 not emulated yet
+			if(RD) begin				
+				if(A[7:0] == 'h2b) begin
+					// joystick0 8 directions: ---FEWSN					
+					// Mist: 0-right, 1-left, 2-down, 3-up, 4-A, 5-B, 6-SELECT, 7-START, 8-X, 9-Y, 10-L, 11-R, 12-L2, 13-R2, 15-L3, 15-R
+					DI[7] <= 1;					
+					DI[6] <= 1;					
+					DI[5] <= 1;					
+					DI[4] <= ~joystick_0[4];					
+					DI[3] <= ~joystick_0[0];
+					DI[2] <= ~joystick_0[1];
+					DI[1] <= ~joystick_0[2];
+					DI[0] <= ~joystick_0[3];
+				end
+				else if(A[7:0] == 'h27) begin
+					// joystick0 fire buttons      				
+					DI[7] <= 1;					
+					DI[6] <= 1;					
+					DI[5] <= 1;					
+					DI[4] <= ~joystick_0[5];					
+					DI[3] <= 1;
+					DI[2] <= 1;
+					DI[1] <= 1;
+					DI[0] <= 1;
+				end
+				else if(A[7:0] == 'h2e) begin
+					// joystick1 8 directions
+					DI[7] <= 1;					
+					DI[6] <= 1;					
+					DI[5] <= 1;					
+					DI[4] <= ~joystick_1[4];					
+					DI[3] <= ~joystick_1[0];
+					DI[2] <= ~joystick_1[1];
+					DI[1] <= ~joystick_1[2];
+					DI[0] <= ~joystick_1[3];
+				end
+				else if(A[7:0] == 'h2d) begin
+					// joystick1 fire buttons      				
+					DI[7] <= 1;					
+					DI[6] <= 1;					
+					DI[5] <= 1;					
+					DI[4] <= ~joystick_1[5];					
+					DI[3] <= 1;
+					DI[2] <= 1;
+					DI[1] <= 1;
+					DI[0] <= 1;
+				end
+							
+				else
+					DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
+					
+				//case 0x00: return printerReady;                  				
 				//case 0x10:
 				//case 0x11:
 				//case 0x12:
 				//case 0x13:
 				//case 0x14:
 				//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;  
-/*
-up    = ~(inp(&h2b) &  1)
-down  = ~(inp(&h2b) &  2)
-left  = ~(inp(&h2b) &  4)
-right = ~(inp(&h2b) &  8)
-fire  = ~(inp(&h2b) & 16)
-fire2 = ~(inp(&h27) & 16)
-Hardware	right	left	down	up	btn 1	btn 2	btn 3	btn 4	btn 5	btn 6	btn 7	btn 8	btn 9	btn 10	btn 11	btn 12
-MiST	right	left	down	up	A	B	SELECT	START	X	Y	L	R	L2	R2	L3	R3
-Hex	0x01	0x02	0x04	0x08	0x10	0x20	0x40	0x80	0x100	0x200	0x400	0x800	0x1000	0x2000	0x4000	0x8000
-*/				
 			end
 			if(WR) begin
 				case(A[7:0])
