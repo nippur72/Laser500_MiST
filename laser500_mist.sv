@@ -11,9 +11,9 @@
 
 // TODO fix sdram jitter problem
 
+// TODO power off
 // TODO add scandoubler/scanlines
 // TODO laser 350/500/700 conf
-// TODO power off
 // TODO tape sounds ON/OFF
 // TODO disk emulation
 // TODO eng/ger/fra keyboard
@@ -68,16 +68,16 @@ module laser500_mist
 localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
 	"O1,Scanlines,On,Off;",
-	"T0,Reset"
+	"T2,Reset"
 };
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
 wire [7:0] status;       // the status register is controlled by the user_io module
 
-wire st_reset = /*st_poweron  =*/ status[0];
+wire st_poweron  = status[0];
 wire st_scalines = status[1];
-wire st_xreset   = status[2];
+wire st_reset    = status[2];
 
 // on screen display
 
@@ -185,6 +185,17 @@ downloader downloader (
    .data  ( download_data )
 );
 
+// RAM eraser helper
+eraser eraser(
+	.clk      ( F3M         ),
+	.trigger  ( st_reset    ),	
+	.erasing  ( eraser_busy ),
+	.wr       ( eraser_wr   ),
+	.addr     ( eraser_addr ),
+	.data     ( eraser_data )
+);
+
+
 /*
 scandoubler scandoubler (
 	.clk_sys( F14M ),
@@ -226,7 +237,7 @@ scandoubler scandoubler (
 // CPU control signals
 wire        CPUCK;          // CPU Clock not used yet
 wire        CPUENA;         // CPU enable
-wire        WAIT_n;         // CPU WAIT 
+wire        WAIT;           // CPU WAIT 
 wire [15:0] cpu_addr;
 wire [7:0]  cpu_din;
 wire [7:0]  cpu_dout;
@@ -241,7 +252,7 @@ wire        cpu_iorq_n;
 
 t80pa cpu
 (
-	.reset_n ( ~(RESET | reset_key) ),   // RESET
+	.reset_n ( ~CPU_RESET    ),  
 	
 	.clk     ( F14M          ),   
 	.cen_p   ( CPUENA        ),   // CPU enable (positive edge)
@@ -262,7 +273,7 @@ t80pa cpu
 	.busrq_n ( 1'b1          ),   // connected to VCC on the Laser 500
 	.int_n   ( video_vs      ),   // VSYNC interrupt
 	.nmi_n   ( 1'b1          ),   // connected to VCC on the Laser 500
-	.wait_n  ( WAIT_n        )    // 
+	.wait_n  ( ~WAIT         )    // 
 	
 );
 
@@ -297,9 +308,9 @@ wire  [7:0] vdc_sdram_din;
 // VTL custom chip
 VTL_chip VTL_chip 
 (	
-	.RESET  ( RESET       ),
 	.F14M   ( F14M        ),
-	//.WAIT_n ( WAIT_n      ),   // wait state for the CPU (TODO to be implemented yet)
+	.RESET  ( ~pll_locked ),
+	.BLANK  ( BLANK       ),		
 	
 	// cpu
    .CPUCK    ( CPUCK         ),
@@ -319,17 +330,12 @@ VTL_chip VTL_chip
 	.g      ( video_g     ),
 	.b      ( video_b     ),
 	
-	// other inputs
-	.blank  ( is_downloading ),
-
 	//	SDRAM interface
 	.sdram_addr   ( vdc_sdram_addr   ), 
 	.sdram_din    ( vdc_sdram_din    ),
 	.sdram_rd     ( vdc_sdram_rd     ),
 	.sdram_wr     ( vdc_sdram_wr     ),
 	.sdram_dout   ( sdram_dout       ), 
-
-	.debug        ( debug   ),
 	
 	.joystick_0   ( joystick_0 ),
 	.joystick_1   ( joystick_1 ),
@@ -376,8 +382,6 @@ pll pll (
 //
 localparam F14M_HZ = 14700000;
 
-wire RESET = ~boot_completed | OSD_reset_pressed;
-
 // detects menu reset button press on the OSD menu
 wire OSD_reset_pressed = (st_reset == 1 && st_resetD == 0);
 reg st_resetD;
@@ -385,7 +389,7 @@ always @(posedge F14M) begin
 	st_resetD <= st_reset;
 end
 
-wire debug;
+wire debug = eraser_busy;
 
 // debug keyboard on the LED
 always @(posedge F14M) begin
@@ -422,12 +426,40 @@ wire        sdram_rd   ;
 wire [7:0]  sdram_dout ; 
 wire [7:0]  sdram_din  ; 
 
+always @(*) begin
+	if(is_downloading) begin
+		sdram_din  = download_data;
+		sdram_addr = download_addr;
+		sdram_wr   = download_wr;
+		sdram_rd   = 1'b1;
+	end
+	else if(eraser_busy) begin
+		/*
+		sdram_din  = eraser_data;
+		sdram_addr = eraser_addr;
+		sdram_wr   = eraser_wr;
+		sdram_rd   = 1'b1;
+		*/
+	end
+	else begin
+		sdram_din  = vdc_sdram_din;
+		sdram_addr = vdc_sdram_addr;
+		sdram_wr   = vdc_sdram_wr;
+		sdram_rd   = vdc_sdram_rd;
+	end	
+end
+
+/*
 assign sdram_din  = is_downloading ? download_data        : vdc_sdram_din;
 assign sdram_addr = is_downloading ? download_addr        : vdc_sdram_addr;
 assign sdram_wr   = is_downloading ? download_wr          : vdc_sdram_wr;
 assign sdram_rd   = is_downloading ? 1'b1                 : vdc_sdram_rd;
+*/
 
-assign WAIT_n = ~(is_downloading | RESET);
+assign WAIT = 0; 
+
+wire CPU_RESET = ~boot_completed | is_downloading | eraser_busy | reset_key ;
+wire BLANK     = ~boot_completed | is_downloading | eraser_busy;
 
 // sdram from zx spectrum core	
 sdram sdram (
@@ -483,21 +515,15 @@ wire audio;
 //
 dac #(.C_bits(16)) dac_AUDIO_L
 (
-	.clk_i   ( F14M   ),
-   .res_n_i ( ~RESET ),	
-	.dac_i   ( { BUZZER ^ CASIN ^ (~CASOUT), 15'b0000000 }  ),
-	.dac_o   ( audio )
+	.clk_i(F14M),
+   .res_n_i(pll_locked),	
+	.dac_i({ BUZZER ^ CASIN ^ (~CASOUT), 15'b0000000 }),
+	.dac_o(audio)
 );
 
 always @(posedge F14M) begin
-	if(RESET) begin
-		AUDIO_L <= 0;
-		AUDIO_R <= 0;
-	end
-	else begin
-		AUDIO_L <= audio;
-		AUDIO_R <= audio;
-	end
+	AUDIO_L <= audio;
+	AUDIO_R <= audio;
 end
 
 
@@ -519,7 +545,7 @@ CASOUT_LPF
 (
 	.clk_i   ( F14M           ),
 	.clken_i ( 1              ),
-	.res_i   ( RESET          ),
+	.res_i   ( pll_locked     ),
 	.din_i   ( { CASOUT, 15'b0 } ),
 	.dout_o  ( CASOUT_LPF_out )
 );

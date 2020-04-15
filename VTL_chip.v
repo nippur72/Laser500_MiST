@@ -4,7 +4,8 @@
 module VTL_chip 
 (	
 	input    F14M,	           // pixel clock 14.77873   (14688000 in laser500emu)
-	input    RESET,           // reset signal
+	input    RESET,           // initialize at power up
+	input    BLANK,           // blank signal - nothing is done	
 		
 	// cpu interface
    output           CPUCK,       // CPU clock to CPU (F14M / 4) - (not used on the MiST, we use F14M & CPUENA)
@@ -40,12 +41,7 @@ module VTL_chip
 	output [5:0] b,
 	
 	output reg BUZZER,
-	output reg CASOUT,  // mapped I/O bit 2  
-	
-	output reg debug,
-	
-	// other ports
-	input blank
+	output reg CASOUT   // mapped I/O bit 2  		
 );
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
@@ -85,16 +81,16 @@ reg[7:0]  ramQ;    // test
 
 reg [3:0] pixel;          // pixel to draw (color index in the palette)
 
-reg [2:0] vdc_graphic_mode_number  = 5;  // graphic mode number 0..5
-reg       vdc_text80_enabled       = 0;  // TEX80 mode, otherwise TEXT40
-reg [3:0] vdc_text80_foreground    = 12; // foreground color for TEXT80 &c.
-reg [3:0] vdc_text80_background    = 3;  // background color for TEXT80 &c.
-reg [3:0] vdc_border_color         = 10; // border color
-reg       vdc_page_7               = 0;  // 1=video RAM is in page 7 (Laser 500/700), 3 otherwise (Laser 350)
+reg [2:0] vdc_graphic_mode_number; // graphic mode number 0..5
+reg       vdc_text80_enabled     ; // TEX80 mode, otherwise TEXT40
+reg [3:0] vdc_text80_foreground  ; // foreground color for TEXT80 &c.
+reg [3:0] vdc_text80_background  ; // background color for TEXT80 &c.
+reg [3:0] vdc_border_color       ; // border color
+reg       vdc_page_7             ; // 1=video RAM is in page 7 (Laser 500/700), 3 otherwise (Laser 350)
 
 // memory mapped I/O write registers 
-reg caps_lock_bit               ; // mapped to bit 6
-reg vdc_graphic_mode_enabled = 0; // mapped to bit 3
+reg caps_lock_bit           ; // mapped to bit 6
+reg vdc_graphic_mode_enabled; // mapped to bit 3
 
 
 // TODO use real 1bit colors
@@ -168,6 +164,8 @@ wire [3:0] bg;
 assign hsync = (hcnt < hsw) ? 0 : 1;
 assign vsync = (vcnt <   4) ? 0 : 1;
 
+wire non_visible_area = hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H;
+
 /*
 // set row address loading colum
 assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number == 5 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
@@ -211,326 +209,271 @@ reg skip_beat;
 
 always@(posedge F14M) begin
 	if(RESET) begin
-		hcnt <= 7;   // starts from 7
+		hcnt <= 0;  
 		vcnt <= 0;
-		pixel <= 0;		
+		ycnt <= 0;
 		banks[0] <= 0;
-		WAIT <= 0;
-		sdram_rd <= 0;
-		sdram_wr <= 0;
-		CASOUT <= 0;
-		BUZZER <= 0;
-		CPUENA <= 0;	
-		MREQ_old <= 0;
 	end
 	else begin		   
 		
-		// works with 118 MHz sdram clock
-		     if(VDC_cnt == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       end 	// VDC ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
-		else if(VDC_cnt == 0) begin                                                  end 	// VDC ram reading ended; VDC saves data into "ramData"; ROM reading starts
-		else if(VDC_cnt == 1) begin                                                  end 	// 
-		else if(VDC_cnt == 2) begin                                                  end 	// 
-		else if(VDC_cnt == 3) begin sdram_rd <= 0;                                   end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      					
-		else if(VDC_cnt == 4) begin sdram_rd <= 1;                                   end 	// 
-		else if(VDC_cnt == 5) begin                                                  end 	// 
-		else if(VDC_cnt == 6) begin                                                  end 	// 
-		
-		// === CPU cyles ===
-		// CPU_cnt == 3    nothing
-		// CPU_cnt == 0    CPU does 1 cycle
-		// CPU_cnt == 1    RAM is read or written according to MREQ, RD and WR
-		// CPU_cnt == 2    CPU samples bus / turns off write
-									
-		// detect MREQ state changes
-		if(CPU_cnt == 3) begin
-			MREQ_old <= MREQ;
-			if(MREQ_old == 0 && MREQ == 1) begin
-				skip_beat <= 1;
-				debug <= 1;
-			end
-			else skip_beat <= 0;
-		end
-		
-		// CPU does one cycle
-		if(CPU_cnt == 0) begin			
-			CPUENA <= !skip_beat;			
-		end			
-		else
-			CPUENA <= 0;
-
-		
-		// RAM is read or written	
-		if(CPU_cnt == 1) begin
-			sdram_rd <= 1; 
-			sdram_addr <= cpuReadAddress;
-			if(MREQ && WR && !skip_beat)	begin				
-				if(mapped_io) begin											
-					caps_lock_bit            <= DO[6];
-					vdc_graphic_mode_enabled <= DO[3];
-					CASOUT                   <= DO[2];					
-					BUZZER                   <= DO[0];
-				end
-				else begin
-					sdram_wr <= bank_is_ram;
-					sdram_din <= DO;  						
-				end		   
-			end
-		end
-
-		// CPU samples bus, written is stopped	
-		if(CPU_cnt == 2) begin
-			if(MREQ && !skip_beat) begin
-				if(RD) begin					
-					if(mapped_io) begin											
-						DI[7] <= CASIN;					
-						DI[6:0] <= KD;						      
-					end				
-					else 
-						DI <= sdram_dout; // read from RAM/ROM						
-				end			
-				if(WR)	begin
-					// terminate write
-					sdram_wr <= 0;  
-				end					
-			end
-		end
-		
-		
-		// Z80 IO 
-		if(CPU_cnt == 2 && IORQ && !skip_beat) begin
-			if(RD) begin				
-				if(A[7:0] == 'h2b) begin
-					// joystick0 8 directions: ---FEWSN					
-					// Mist: 0-right, 1-left, 2-down, 3-up, 4-A, 5-B, 6-SELECT, 7-START, 8-X, 9-Y, 10-L, 11-R, 12-L2, 13-R2, 15-L3, 15-R
-					DI[7] <= 1;					
-					DI[6] <= 1;					
-					DI[5] <= 1;					
-					DI[4] <= ~joystick_0[4];					
-					DI[3] <= ~joystick_0[0];
-					DI[2] <= ~joystick_0[1];
-					DI[1] <= ~joystick_0[2];
-					DI[0] <= ~joystick_0[3];
-				end
-				else if(A[7:0] == 'h27) begin
-					// joystick0 fire buttons      				
-					DI[7] <= 1;					
-					DI[6] <= 1;					
-					DI[5] <= 1;					
-					DI[4] <= ~joystick_0[5];					
-					DI[3] <= 1;
-					DI[2] <= 1;
-					DI[1] <= 1;
-					DI[0] <= 1;
-				end
-				else if(A[7:0] == 'h2e) begin
-					// joystick1 8 directions
-					DI[7] <= 1;					
-					DI[6] <= 1;					
-					DI[5] <= 1;					
-					DI[4] <= ~joystick_1[4];					
-					DI[3] <= ~joystick_1[0];
-					DI[2] <= ~joystick_1[1];
-					DI[1] <= ~joystick_1[2];
-					DI[0] <= ~joystick_1[3];
-				end
-				else if(A[7:0] == 'h2d) begin
-					// joystick1 fire buttons      				
-					DI[7] <= 1;					
-					DI[6] <= 1;					
-					DI[5] <= 1;					
-					DI[4] <= ~joystick_1[5];					
-					DI[3] <= 1;
-					DI[2] <= 1;
-					DI[1] <= 1;
-					DI[0] <= 1;
-				end
-							
-				else
-					DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
-					
-				//case 0x00: return printerReady;                  				
-				//case 0x10:
-				//case 0x11:
-				//case 0x12:
-				//case 0x13:
-				//case 0x14:
-				//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;  
-			end
-			if(WR) begin
-				case(A[7:0])
-					'h40: banks[0] <= DO[3:0];
-					'h41: banks[1] <= DO[3:0];
-					'h42: banks[2] <= DO[3:0];
-					'h43: banks[3] <= DO[3:0];
-					'h44:
-						begin	
-							vdc_page_7         <= ~DO[3];
-							vdc_text80_enabled <= DO[0]; 
-							vdc_border_color   <= DO[7:4];
-							
-							if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              											
-							if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
-							if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
-							if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
-							if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
-							if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
-						end
-					'h45:
-						begin
-							vdc_text80_foreground <= DO[7:4];
-							vdc_text80_background <= DO[3:0];         
-						end
-					'h0d: ;
-						// printerWrite(value);
-					'h0e: ;
-						// printer port duplicated here							
-					'h10: ;
-					'h11: ;
-					'h12: ;
-					'h13: ;
-					'h14: ;
-						//if(emulate_fdc) floppy_write_port(port & 0xFF, value); 
-						//return;     				
-				endcase				
-			end
-		end		
-   	
-		
-		// counters 
-		if(hcnt == hsw+hbp+H+hfp-1) 
-		begin
+		// main counters 
+		if(hcnt == hsw+hbp+H+hfp-1) begin
 			hcnt <= 10'd0;
-			if(vcnt == V-1) 
-			begin
+			if(vcnt == V-1) begin
 				vcnt <= 10'd0;				
 			end
-			else vcnt <= vcnt + 10'd1;
+			else 
+				vcnt <= vcnt + 10'd1;
 				
 			if(vcnt == TOP_BORDER_WIDTH-1) ycnt <= 10'd0;
 			else                           ycnt <= ycnt + 10'd1;
 		end
 		else hcnt <= hcnt + 10'd1;
 
-		
-		// draw pixel at hcnt,vcnt, graphic data contained in "char"
-		if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
-			pixel <= 0;   // blanking zone 
-		else if(blank == 1) 
-			pixel <= 'hC; // forced blank (io_download)        	
-		else if( (vcnt < TOP_BORDER_WIDTH || vcnt >= TOP_BORDER_WIDTH + HEIGHT) || 
-					(hcnt < hsw+hbp + LEFT_BORDER_WIDTH || hcnt >= hsw+hbp + LEFT_BORDER_WIDTH + WIDTH)) 
-			pixel <= vdc_border_color; 				
-		else 
-		begin
-			if(vdc_graphic_mode_enabled == 1) begin
-				if(vdc_graphic_mode_number == 5) begin
-					// GR 5 640x192x1
+		if(BLANK) begin
+			if(non_visible_area) pixel <= 0;   
+			else pixel <= vdc_border_color; 
+		end
+		else begin
+			// normal VDC operation
+				
+			// works with 118 MHz sdram clock
+				  if(VDC_cnt == 7) begin sdram_rd <= 1; sdram_addr <= videoAddress;       end 	// VDC ram reading starts; ROM reading ended, data is stored in "char" or "ramDataD"
+			else if(VDC_cnt == 0) begin                                                  end 	// VDC ram reading ended; VDC saves data into "ramData"; ROM reading starts
+			else if(VDC_cnt == 1) begin                                                  end 	// 
+			else if(VDC_cnt == 2) begin                                                  end 	// 
+			else if(VDC_cnt == 3) begin sdram_rd <= 0;                                   end 	// ram refresh cycle, apparently needed when ram_clk runs at 118Mhz	 					 	      					
+			else if(VDC_cnt == 4) begin sdram_rd <= 1;                                   end 	// 
+			else if(VDC_cnt == 5) begin                                                  end 	// 
+			else if(VDC_cnt == 6) begin                                                  end 	// 
+			
+			// === CPU cyles ===
+			// CPU_cnt == 3    nothing
+			// CPU_cnt == 0    CPU does 1 cycle
+			// CPU_cnt == 1    RAM is read or written according to MREQ, RD and WR
+			// CPU_cnt == 2    CPU samples bus / turns off write
+										
+			// detect MREQ state changes
+			if(CPU_cnt == 3) begin
+				MREQ_old <= MREQ;
+				if(MREQ_old == 0 && MREQ == 1) begin
+					skip_beat <= 1;					
+				end
+				else skip_beat <= 0;
+			end
+			
+			// CPU does one cycle
+			if(CPU_cnt == 0) begin			
+				CPUENA <= !skip_beat;			
+			end			
+			else
+				CPUENA <= 0;
+			
+			// RAM is read or written	
+			if(CPU_cnt == 1) begin
+				sdram_rd <= 1; 
+				sdram_addr <= cpuReadAddress;
+				if(MREQ && WR && !skip_beat)	begin				
+					if(mapped_io) begin											
+						caps_lock_bit            <= DO[6];
+						vdc_graphic_mode_enabled <= DO[3];
+						CASOUT                   <= DO[2];					
+						BUZZER                   <= DO[0];
+					end
+					else begin
+						sdram_wr <= bank_is_ram;
+						sdram_din <= DO;  						
+					end		   
+				end
+			end
+
+			// CPU samples bus, written is stopped	
+			if(CPU_cnt == 2) begin
+				if(MREQ && !skip_beat) begin
+					if(RD) begin					
+						if(mapped_io) begin											
+							DI[7] <= CASIN;					
+							DI[6:0] <= KD;						      
+						end				
+						else 
+							DI <= sdram_dout; // read from RAM/ROM						
+					end			
+					if(WR)	begin
+						// terminate write
+						sdram_wr <= 0;  
+					end					
+				end
+			end
+					
+			// Z80 IO 
+			if(CPU_cnt == 2 && IORQ && !skip_beat) begin
+				if(RD) begin				
+					if(A[7:0] == 'h2b) begin
+						// joystick0 8 directions: ---FEWSN					
+						// Mist: 0-right, 1-left, 2-down, 3-up, 4-A, 5-B, 6-SELECT, 7-START, 8-X, 9-Y, 10-L, 11-R, 12-L2, 13-R2, 15-L3, 15-R
+						DI[7] <= 1;					
+						DI[6] <= 1;					
+						DI[5] <= 1;					
+						DI[4] <= ~joystick_0[4];					
+						DI[3] <= ~joystick_0[0];
+						DI[2] <= ~joystick_0[1];
+						DI[1] <= ~joystick_0[2];
+						DI[0] <= ~joystick_0[3];
+					end
+					else if(A[7:0] == 'h27) begin
+						// joystick0 fire buttons      				
+						DI[7] <= 1;					
+						DI[6] <= 1;					
+						DI[5] <= 1;					
+						DI[4] <= ~joystick_0[5];					
+						DI[3] <= 1;
+						DI[2] <= 1;
+						DI[1] <= 1;
+						DI[0] <= 1;
+					end
+					else if(A[7:0] == 'h2e) begin
+						// joystick1 8 directions
+						DI[7] <= 1;					
+						DI[6] <= 1;					
+						DI[5] <= 1;					
+						DI[4] <= ~joystick_1[4];					
+						DI[3] <= ~joystick_1[0];
+						DI[2] <= ~joystick_1[1];
+						DI[1] <= ~joystick_1[2];
+						DI[0] <= ~joystick_1[3];
+					end
+					else if(A[7:0] == 'h2d) begin
+						// joystick1 fire buttons      				
+						DI[7] <= 1;					
+						DI[6] <= 1;					
+						DI[5] <= 1;					
+						DI[4] <= ~joystick_1[5];					
+						DI[3] <= 1;
+						DI[2] <= 1;
+						DI[1] <= 1;
+						DI[0] <= 1;
+					end
+								
+					else
+						DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
+						
+					//case 0x00: return printerReady;                  				
+					//case 0x10:
+					//case 0x11:
+					//case 0x12:
+					//case 0x13:
+					//case 0x14:
+					//	return emulate_fdc ? floppy_read_port(port & 0xFF) : 0xFF;  
+				end
+				if(WR) begin
+					case(A[7:0])
+						'h40: banks[0] <= DO[3:0];
+						'h41: banks[1] <= DO[3:0];
+						'h42: banks[2] <= DO[3:0];
+						'h43: banks[3] <= DO[3:0];
+						'h44:
+							begin	
+								vdc_page_7         <= ~DO[3];
+								vdc_text80_enabled <= DO[0]; 
+								vdc_border_color   <= DO[7:4];
+								
+								if(DO[2:1] == 'b00)  vdc_graphic_mode_number <= 5;              											
+								if(DO[2:0] == 'b010) vdc_graphic_mode_number <= 4;
+								if(DO[2:0] == 'b011) vdc_graphic_mode_number <= 3;
+								if(DO[2:0] == 'b110) vdc_graphic_mode_number <= 2;
+								if(DO[2:0] == 'b111) vdc_graphic_mode_number <= 1;
+								if(DO[2:1] == 'b10)  vdc_graphic_mode_number <= 0;                  
+							end
+						'h45:
+							begin
+								vdc_text80_foreground <= DO[7:4];
+								vdc_text80_background <= DO[3:0];         
+							end
+						'h0d: ;
+							// printerWrite(value);
+						'h0e: ;
+							// printer port duplicated here							
+						'h10: ;
+						'h11: ;
+						'h12: ;
+						'h13: ;
+						'h14: ;
+							//if(emulate_fdc) floppy_write_port(port & 0xFF, value); 
+							//return;     				
+					endcase				
+				end
+			end		
+								
+			// draw pixel at hcnt,vcnt, graphic data contained in "char"
+			if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
+				pixel <= 0;   // blanking zone 
+			else if( (vcnt < TOP_BORDER_WIDTH || vcnt >= TOP_BORDER_WIDTH + HEIGHT) || 
+						(hcnt < hsw+hbp + LEFT_BORDER_WIDTH || hcnt >= hsw+hbp + LEFT_BORDER_WIDTH + WIDTH)) 
+				pixel <= vdc_border_color; 				
+			else 
+			begin
+				if(vdc_graphic_mode_enabled == 1) begin
+					if(vdc_graphic_mode_number == 5) begin
+						// GR 5 640x192x1
+						pixel <= char[0] == 1 ? fg : bg;
+						char <= char >> 1;         
+					end 
+					else if(vdc_graphic_mode_number == 4) begin
+						// GR 4 320x192x2
+						if(xcnt[0] == 0) begin
+							pixel <= char[0] == 1 ? fg : bg;
+							char <= char >> 1;
+						end               
+					end 
+					else if(vdc_graphic_mode_number == 3 || vdc_graphic_mode_number == 0) begin
+						// GR 3 160x192x16, GR 0 160x96
+						if(xcnt[1:0] == 0) begin
+							pixel = char[3:0];
+							char = char >> 4;
+						end               
+					end 
+					else if(vdc_graphic_mode_number == 2) begin
+						// GR 2 320x196x1
+						if(xcnt[0] == 0) begin
+							pixel <= char[0] == 1 ? fg : bg;
+							char <= char >> 1;
+						end
+					end 
+					else if(vdc_graphic_mode_number == 1) begin
+						// GR 1 160x192x2
+						if(xcnt[1:0] == 0) begin
+							pixel <= char[0] == 1 ? fg : bg;
+							char <= char >> 1;
+						end
+					end
+				end	
+				else if(vdc_text80_enabled) begin
+					// TEXT 80
 					pixel <= char[0] == 1 ? fg : bg;
 					char <= char >> 1;         
-				end 
-				else if(vdc_graphic_mode_number == 4) begin
-					// GR 4 320x192x2
-					if(xcnt[0] == 0) begin
-						pixel <= char[0] == 1 ? fg : bg;
-						char <= char >> 1;
-					end               
-				end 
-				else if(vdc_graphic_mode_number == 3 || vdc_graphic_mode_number == 0) begin
-					// GR 3 160x192x16, GR 0 160x96
-					if(xcnt[1:0] == 0) begin
-						pixel = char[3:0];
-						char = char >> 4;
-					end               
-				end 
-				else if(vdc_graphic_mode_number == 2) begin
-					// GR 2 320x196x1
-					if(xcnt[0] == 0) begin
-						pixel <= char[0] == 1 ? fg : bg;
-						char <= char >> 1;
-					end
-				end 
-				else if(vdc_graphic_mode_number == 1) begin
-					// GR 1 160x192x2
-					if(xcnt[1:0] == 0) begin
-						pixel <= char[0] == 1 ? fg : bg;
-						char <= char >> 1;
-					end
-				end
-			end	
-			else if(vdc_text80_enabled) begin
-				// TEXT 80
-				pixel <= char[0] == 1 ? fg : bg;
-				char <= char >> 1;         
-			end
-			else begin
-				// TEXT 40
-				if(xcnt[0] == 0) begin
-					pixel <= char[0] == 1 ? fg : bg;
-					char <= char >> 1;
-				end
-			end	
-		end
-
-		// read character from RAM and stores into latch "ramData", starts ROM reading   
-		if(xcnt[2:0] == 1) begin
-			ramData <= sdram_dout;			
-			charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra				
-		end		
-
-		/*
-		// calculate RAM address of character/byte and start reading video RAM
-		if(xcnt[2:0] == 7) begin 
-			
-			// load start row address on the leftmost column
-			if(hcnt == load_column) begin
-				if(vdc_graphic_mode_enabled) begin					
-					if(vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 4 || vdc_graphic_mode_number == 3) begin
-						// GR 5, GR 4, GR 3                                                               
-						ramAddress[13]  = ycnt[2];
-						ramAddress[12]  = ycnt[1];
-						ramAddress[11]  = ycnt[0];
-						ramAddress[10]  = ycnt[5];
-						ramAddress[ 9]  = ycnt[4];
-						ramAddress[ 8]  = ycnt[3];
-						ramAddress[ 7]  = ycnt[7];
-						ramAddress[ 6]  = ycnt[6];
-						ramAddress[ 5]  = ycnt[7];
-						ramAddress[ 4]  = ycnt[6];
-						ramAddress[3:0] = 0;
-					end else if(vdc_graphic_mode_number == 2 || vdc_graphic_mode_number == 1) begin
-						// GR 2 and GR 1           
-						ramAddress[13]  = 1;
-						ramAddress[12]  = ycnt[2];
-						ramAddress[11]  = ycnt[1];
-						ramAddress[10]  = ycnt[5];
-						ramAddress[ 9]  = ycnt[4];
-						ramAddress[ 8]  = ycnt[3];
-						ramAddress[ 7]  = ycnt[0];
-						ramAddress[ 6]  = ycnt[7];
-						ramAddress[ 5]  = ycnt[6];
-						ramAddress[ 4]  = ycnt[7];
-						ramAddress[ 3]  = ycnt[6];
-						ramAddress[2:0] = 0;
-					end else if(vdc_graphic_mode_number == 0) begin
-						// GR 0            
-						ramAddress[13]  = 1;
-						ramAddress[12]  = ycnt[2];
-						ramAddress[11]  = ycnt[1];
-						ramAddress[10]  = ycnt[5];
-						ramAddress[ 9]  = ycnt[4];
-						ramAddress[ 8]  = ycnt[3];
-						ramAddress[ 7]  = ycnt[7];
-						ramAddress[ 6]  = ycnt[6];
-						ramAddress[ 5]  = ycnt[7];
-						ramAddress[ 4]  = ycnt[6];
-						ramAddress[3:0] = 0;
-					end
 				end
 				else begin
-					// TEXT 80 and TEXT 40      
-					ramAddress[13]  = 1;
-					ramAddress[12]  = 1;
-					ramAddress[11]  = 1;         
+					// TEXT 40
+					if(xcnt[0] == 0) begin
+						pixel <= char[0] == 1 ? fg : bg;
+						char <= char >> 1;
+					end
+				end	
+			end
+
+			// read character from RAM and stores into latch "ramData", starts ROM reading   
+			if(xcnt[2:0] == 1) begin
+				ramData <= sdram_dout;			
+				charsetAddress <= (sdram_dout << 3) | ycnt[2:0]; // TODO eng/ger/fra				
+			end		
+			
+			// calculate RAM address 					
+			if(vdc_graphic_mode_enabled) begin					
+				if(vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 4 || vdc_graphic_mode_number == 3) begin
+					// GR 5, GR 4, GR 3                                                               
+					ramAddress[13]  = ycnt[2];
+					ramAddress[12]  = ycnt[1];
+					ramAddress[11]  = ycnt[0];
 					ramAddress[10]  = ycnt[5];
 					ramAddress[ 9]  = ycnt[4];
 					ramAddress[ 8]  = ycnt[3];
@@ -539,138 +482,116 @@ always@(posedge F14M) begin
 					ramAddress[ 5]  = ycnt[7];
 					ramAddress[ 4]  = ycnt[6];
 					ramAddress[3:0] = 0;
+					
+						  if(vdc_graphic_mode_number == 5) ramAddress = ramAddress + (xcnt1 >> 3);   
+					else if(vdc_graphic_mode_number == 4) ramAddress = ramAddress + (xcnt2 >> 3);   
+					else if(vdc_graphic_mode_number == 3) ramAddress = ramAddress + (xcnt1 >> 3);   
+
+				end else if(vdc_graphic_mode_number == 2 || vdc_graphic_mode_number == 1) begin
+					// GR 2 and GR 1           
+					ramAddress[13]  = 1;
+					ramAddress[12]  = ycnt[2];
+					ramAddress[11]  = ycnt[1];
+					ramAddress[10]  = ycnt[5];
+					ramAddress[ 9]  = ycnt[4];
+					ramAddress[ 8]  = ycnt[3];
+					ramAddress[ 7]  = ycnt[0];
+					ramAddress[ 6]  = ycnt[7];
+					ramAddress[ 5]  = ycnt[6];
+					ramAddress[ 4]  = ycnt[7];
+					ramAddress[ 3]  = ycnt[6];
+					ramAddress[2:0] = 0;
+					
+						  if(vdc_graphic_mode_number == 2) ramAddress = ramAddress + (xcnt1 >> 4);   
+					else if(vdc_graphic_mode_number == 1) ramAddress = ramAddress + (xcnt3 >> 4);   
+
+				end else if(vdc_graphic_mode_number == 0) begin
+					// GR 0            
+					ramAddress[13]  = 1;
+					ramAddress[12]  = ycnt[2];
+					ramAddress[11]  = ycnt[1];
+					ramAddress[10]  = ycnt[5];
+					ramAddress[ 9]  = ycnt[4];
+					ramAddress[ 8]  = ycnt[3];
+					ramAddress[ 7]  = ycnt[7];
+					ramAddress[ 6]  = ycnt[6];
+					ramAddress[ 5]  = ycnt[7];
+					ramAddress[ 4]  = ycnt[6];
+					ramAddress[3:0] = 0;
+					
+					ramAddress = ramAddress + (xcnt1 >> 3); 
 				end
-			end	
-			else begin
-				ramAddress = ramAddress + 1;  
-			end 			
-		end
-		*/
-		
-		// calculate RAM address 					
-		if(vdc_graphic_mode_enabled) begin					
-			if(vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 4 || vdc_graphic_mode_number == 3) begin
-				// GR 5, GR 4, GR 3                                                               
-				ramAddress[13]  = ycnt[2];
-				ramAddress[12]  = ycnt[1];
-				ramAddress[11]  = ycnt[0];
-				ramAddress[10]  = ycnt[5];
-				ramAddress[ 9]  = ycnt[4];
-				ramAddress[ 8]  = ycnt[3];
-				ramAddress[ 7]  = ycnt[7];
-				ramAddress[ 6]  = ycnt[6];
-				ramAddress[ 5]  = ycnt[7];
-				ramAddress[ 4]  = ycnt[6];
-				ramAddress[3:0] = 0;
-				
-				     if(vdc_graphic_mode_number == 5) ramAddress = ramAddress + (xcnt1 >> 3);   
-				else if(vdc_graphic_mode_number == 4) ramAddress = ramAddress + (xcnt2 >> 3);   
-				else if(vdc_graphic_mode_number == 3) ramAddress = ramAddress + (xcnt1 >> 3);   
-
-			end else if(vdc_graphic_mode_number == 2 || vdc_graphic_mode_number == 1) begin
-				// GR 2 and GR 1           
-				ramAddress[13]  = 1;
-				ramAddress[12]  = ycnt[2];
-				ramAddress[11]  = ycnt[1];
-				ramAddress[10]  = ycnt[5];
-				ramAddress[ 9]  = ycnt[4];
-				ramAddress[ 8]  = ycnt[3];
-				ramAddress[ 7]  = ycnt[0];
-				ramAddress[ 6]  = ycnt[7];
-				ramAddress[ 5]  = ycnt[6];
-				ramAddress[ 4]  = ycnt[7];
-				ramAddress[ 3]  = ycnt[6];
-				ramAddress[2:0] = 0;
-				
-				     if(vdc_graphic_mode_number == 2) ramAddress = ramAddress + (xcnt1 >> 4);   
-				else if(vdc_graphic_mode_number == 1) ramAddress = ramAddress + (xcnt3 >> 4);   
-
-			end else if(vdc_graphic_mode_number == 0) begin
-				// GR 0            
-				ramAddress[13]  = 1;
-				ramAddress[12]  = ycnt[2];
-				ramAddress[11]  = ycnt[1];
-				ramAddress[10]  = ycnt[5];
-				ramAddress[ 9]  = ycnt[4];
-				ramAddress[ 8]  = ycnt[3];
-				ramAddress[ 7]  = ycnt[7];
-				ramAddress[ 6]  = ycnt[6];
-				ramAddress[ 5]  = ycnt[7];
-				ramAddress[ 4]  = ycnt[6];
-				ramAddress[3:0] = 0;
-				
-				ramAddress = ramAddress + (xcnt1 >> 3); 
 			end
-		end
-		else begin
-			// TEXT 80 and TEXT 40      
-			ramAddress[13]  = 1;
-			ramAddress[12]  = 1;
-			ramAddress[11]  = 1;         
-			ramAddress[10]  = ycnt[5];
-			ramAddress[ 9]  = ycnt[4];
-			ramAddress[ 8]  = ycnt[3];
-			ramAddress[ 7]  = ycnt[7];
-			ramAddress[ 6]  = ycnt[6];
-			ramAddress[ 5]  = ycnt[7];
-			ramAddress[ 4]  = ycnt[6];
-			ramAddress[3:0] = 0;
-			
-			     if(vdc_text80_enabled) ramAddress = ramAddress + (xcnt1 >> 3);   
-			else                        ramAddress = ramAddress + (xcnt2 >> 3);
-		end			
-			
-		// T=7 move saved latch to the pixel register 
-		if(vdc_graphic_mode_enabled) begin
-			// gr modes
-			if(vdc_graphic_mode_number == 5) begin
+			else begin
+				// TEXT 80 and TEXT 40      
+				ramAddress[13]  = 1;
+				ramAddress[12]  = 1;
+				ramAddress[11]  = 1;         
+				ramAddress[10]  = ycnt[5];
+				ramAddress[ 9]  = ycnt[4];
+				ramAddress[ 8]  = ycnt[3];
+				ramAddress[ 7]  = ycnt[7];
+				ramAddress[ 6]  = ycnt[6];
+				ramAddress[ 5]  = ycnt[7];
+				ramAddress[ 4]  = ycnt[6];
+				ramAddress[3:0] = 0;
+				
+					  if(vdc_text80_enabled) ramAddress = ramAddress + (xcnt1 >> 3);   
+				else                        ramAddress = ramAddress + (xcnt2 >> 3);
+			end			
+				
+			// T=7 move saved latch to the pixel register 
+			if(vdc_graphic_mode_enabled) begin
+				// gr modes
+				if(vdc_graphic_mode_number == 5) begin
+					if(xcnt[2:0] == 7) begin
+						char <= ramData;             
+					end
+				end else if(vdc_graphic_mode_number == 4) begin
+					// GR 4
+					if(xcnt[3:0] == 7) begin
+						ramDataD <= ramData;             
+					end   
+					else if(xcnt[3:0] == 15) begin
+						char <= ramDataD;
+						fgbg <= ramData;             
+					end   
+				end else if(vdc_graphic_mode_number == 3 || vdc_graphic_mode_number == 0) begin
+					// GR 3
+					if(xcnt[2:0] == 7) begin
+						char <= ramData;             
+					end
+				end else if(vdc_graphic_mode_number == 2) begin
+					if(xcnt[3:0] == 15) begin
+						char <= ramData;             
+					end
+				end else if(vdc_graphic_mode_number == 1) begin
+					if(xcnt[4:0] == 15) begin
+						ramDataD <= ramData;             
+					end   
+					else if(xcnt[4:0] == 31) begin
+						char <= ramDataD;
+						fgbg <= ramData;             
+					end   
+				end            
+			end
+			else if(vdc_text80_enabled) begin
+				// TEXT 80
 				if(xcnt[2:0] == 7) begin
-					char <= ramData;             
-				end
-			end else if(vdc_graphic_mode_number == 4) begin
-				// GR 4
+					char <= charsetQ;
+				end   
+			end
+			else begin
+				// TEXT 40
 				if(xcnt[3:0] == 7) begin
-					ramDataD <= ramData;             
+					ramDataD <= charsetQ;
 				end   
 				else if(xcnt[3:0] == 15) begin
 					char <= ramDataD;
-					fgbg <= ramData;             
+					fgbg <= ramData;          
 				end   
-			end else if(vdc_graphic_mode_number == 3 || vdc_graphic_mode_number == 0) begin
-				// GR 3
-				if(xcnt[2:0] == 7) begin
-					char <= ramData;             
-				end
-			end else if(vdc_graphic_mode_number == 2) begin
-				if(xcnt[3:0] == 15) begin
-					char <= ramData;             
-				end
-			end else if(vdc_graphic_mode_number == 1) begin
-				if(xcnt[4:0] == 15) begin
-					ramDataD <= ramData;             
-				end   
-				else if(xcnt[4:0] == 31) begin
-					char <= ramDataD;
-					fgbg <= ramData;             
-				end   
-			end            
-		end
-		else if(vdc_text80_enabled) begin
-			// TEXT 80
-			if(xcnt[2:0] == 7) begin
-				char <= charsetQ;
 			end   
 		end
-		else begin
-			// TEXT 40
-			if(xcnt[3:0] == 7) begin
-				ramDataD <= charsetQ;
-			end   
-			else if(xcnt[3:0] == 15) begin
-				char <= ramDataD;
-				fgbg <= ramData;          
-			end   
-		end   
 	end
 end 
 

@@ -159,6 +159,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_global_assignment -name VHDL_FILE t80/T80pa.vhd
 set_global_assignment -name VHDL_FILE t80/T80_Reg.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE laser500_mist.sv
+set_global_assignment -name VERILOG_FILE eraser.v
 set_global_assignment -name VERILOG_FILE "mist-modules/data_io.v"
 set_global_assignment -name VERILOG_FILE "mist-modules/osd.v"
 set_global_assignment -name VERILOG_FILE "mist-modules/user_io.v"
