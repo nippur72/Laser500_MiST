@@ -46,11 +46,11 @@ module VTL_chip
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
 parameter hsw = 66;         // hsync width
-parameter hbp = 78;         // horizontal back porch, unused time after hsync
+parameter hbp = 70;         // horizontal back porch, unused time after hsync
 
 parameter HEIGHT              = 192;  // height of active area  
-parameter TOP_BORDER_WIDTH    =  64;  // top border
-parameter BOTTOM_BORDER_WIDTH =  56;  // bottom
+parameter TOP_BORDER_WIDTH    =  65;  // top border
+parameter BOTTOM_BORDER_WIDTH =  55;  // bottom
 parameter V                   = 312;  // number of lines
 
 parameter WIDTH               = 640;  // width of active area  
@@ -66,8 +66,7 @@ wire[12:0] xcnt;          // active area x TODO, replace with hcnt?
 wire[12:0] xcnt1;         // active area x TODO, replace with hcnt?
 wire[12:0] xcnt2;         // active area x TODO, replace with hcnt?
 wire[12:0] xcnt3;         // active area x TODO, replace with hcnt?
-
-reg[9:0]   ycnt;          // active area y
+wire[9:0]  ycnt;          // active area y
 
 reg[7:0]  char;           // bitmap graphic data to display
 reg[7:0]  fgbg;           // foreground-background colors for the graphic to display
@@ -94,59 +93,21 @@ reg vdc_graphic_mode_enabled; // mapped to bit 3
 
 
 // TODO use real 1bit colors
-/*
 parameter col0 = 12'h000;  // black 
 parameter col1 = 12'h00f;  // blue 
 parameter col2 = 12'h080;  // green 
-parameter col3 = 12'h09f;  // cyan 
-parameter col4 = 12'h600;  // red 
-parameter col5 = 12'h83f;  // magenta 
+parameter col3 = 12'h08f;  // cyan 
+parameter col4 = 12'ha00;  // red 
+parameter col5 = 12'hf0f;  // magenta 
 parameter col6 = 12'h780;  // yellow 
-parameter col7 = 12'hccc;  // bright grey 
-parameter col8 = 12'h667;  // dark grey 
+parameter col7 = 12'h999;  // bright grey 
+parameter col8 = 12'h555;  // dark grey 
 parameter col9 = 12'h88f;  // bright blue 
-parameter cola = 12'h5e3;  // bright green 
-parameter colb = 12'h8cf;  // bright cyan 
-parameter colc = 12'hf59;  // bright red 
-parameter cold = 12'hf9f;  // bright magenta 
-parameter cole = 12'hee6;  // bright yellow 
-parameter colf = 12'hfff;  // white 
-*/
-
-/*
-parameter col0 = 12'h000;  // black 
-parameter col1 = 12'h008;  // blue 
-parameter col2 = 12'h080;  // green 
-parameter col3 = 12'h088;  // cyan 
-parameter col4 = 12'h800;  // red 
-parameter col5 = 12'h088;  // magenta 
-parameter col6 = 12'h880;  // yellow 
-parameter col7 = 12'h888;  // bright grey 
-parameter col8 = 12'h444;  // dark grey 
-parameter col9 = 12'h44f;  // bright blue 
-parameter cola = 12'h3f3;  // bright green 
+parameter cola = 12'h0f0;  // bright green 
 parameter colb = 12'h4ff;  // bright cyan 
-parameter colc = 12'hf44;  // bright red 
-parameter cold = 12'hf4f;  // bright magenta 
-parameter cole = 12'hff4;  // bright yellow 
-parameter colf = 12'hfff;  // white 
-*/
-
-parameter col0 = 12'h000;  // black 
-parameter col1 = 12'h00f;  // blue 
-parameter col2 = 12'h0a0;  // green 
-parameter col3 = 12'h08a;  // cyan 
-parameter col4 = 12'hf00;  // red 
-parameter col5 = 12'h808;  // magenta 
-parameter col6 = 12'h790;  // yellow 
-parameter col7 = 12'h888;  // bright grey 
-parameter col8 = 12'h666;  // dark grey 
-parameter col9 = 12'h66f;  // bright blue 
-parameter cola = 12'h6f6;  // bright green 
-parameter colb = 12'h6ff;  // bright cyan 
-parameter colc = 12'hf66;  // bright red 
-parameter cold = 12'hf6f;  // bright magenta 
-parameter cole = 12'hff6;  // bright yellow 
+parameter colc = 12'hf45;  // bright red 
+parameter cold = 12'hf9f;  // bright magenta 
+parameter cole = 12'hcf0;  // bright yellow 
 parameter colf = 12'hfff;  // white 
 
 rom_charset rom_charset (
@@ -165,18 +126,6 @@ assign hsync = (hcnt < hsw) ? 0 : 1;
 assign vsync = (vcnt <   4) ? 0 : 1;
 
 wire non_visible_area = hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H;
-
-/*
-// set row address loading colum
-assign load_column =  vdc_graphic_mode_enabled && vdc_graphic_mode_number == 5 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 4 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(3*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 3 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 2 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 1 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(5*8)
-						  : vdc_graphic_mode_enabled && vdc_graphic_mode_number == 0 ? hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  : vdc_text80_enabled ?                                       hsw+hbp+LEFT_BORDER_WIDTH-1-(2*8)
-						  :                                                            hsw+hbp+LEFT_BORDER_WIDTH-1-(3*8);
-*/
 						  
 // calculate foreground and background colors						  
 assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || (!vdc_graphic_mode_enabled && vdc_text80_enabled) ? vdc_text80_foreground : fgbg[7:4];
@@ -188,6 +137,8 @@ assign xcnt = hcnt - (hsw+hbp+LEFT_BORDER_WIDTH);
 assign xcnt1 = xcnt + 8 +8; // text80, gr0, gr2, gr3, gr5             
 assign xcnt2 = xcnt + 16+8; // text40 and gr4
 assign xcnt3 = xcnt + 24+8; // gr1   
+
+assign ycnt = vcnt - TOP_BORDER_WIDTH;
 
 wire [2:0] VDC_cnt = hcnt[2:0];       // clock divider and bus slot assignment
 wire [1:0] CPU_cnt = hcnt[1:0];   // 
@@ -211,7 +162,6 @@ always@(posedge F14M) begin
 	if(RESET) begin
 		hcnt <= 0;  
 		vcnt <= 0;
-		ycnt <= 0;
 		banks[0] <= 0;
 	end
 	else begin		   
@@ -225,8 +175,10 @@ always@(posedge F14M) begin
 			else 
 				vcnt <= vcnt + 10'd1;
 				
+			/*	
 			if(vcnt == TOP_BORDER_WIDTH-1) ycnt <= 10'd0;
 			else                           ycnt <= ycnt + 10'd1;
+			*/
 		end
 		else hcnt <= hcnt + 10'd1;
 
