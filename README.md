@@ -4,6 +4,10 @@ Video Technology Laser 350/500/700 for the MiST FPGA
 
 # CHANGELOG
 
+- 16-Apr-2020
+  - Fixed screen geometry, now it's accurate to the cycle 
+  - Improved palette
+
 - 15-Apr-2020
   - Joystick emulation  
   
