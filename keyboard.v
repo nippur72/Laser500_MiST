@@ -140,14 +140,14 @@ parameter [15:0] KEY_MULT_NUMPAD   = 'h7c;
 parameter [15:0] KEY_SLASH_NUMPAD  = 'he04a;
 parameter [15:0] KEY_DOT_NUMPAD    = 'h71;
 
-wire [7:0] byte;   // keyboard data byte, 0xE0 = extended key, 0xF0 release key
+wire [7:0] kdata;  // keyboard data byte, 0xE0 = extended key, 0xF0 release key
 wire valid;        // 1 = data byte contains valid keyboard data 
 wire error;        // not used here
 
 reg key_status;
 reg key_extended;
 
-wire [15:0] key = { (key_extended ? 8'he0 : 8'h00) , byte };
+wire [15:0] key = { (key_extended ? 8'he0 : 8'h00) , kdata };
 
 always @(posedge clk) begin
 	if(reset) begin		
@@ -169,10 +169,10 @@ always @(posedge clk) begin
 	else begin
 		// ps2 decoder has received a valid byte
 		if(valid) begin
-			if(byte == 8'he0) 
+			if(kdata == 8'he0) 
 				// extended key code
             key_extended <= 1'b1;
-         else if(byte == 8'hf0)
+         else if(kdata == 8'hf0)
 				// release code
             key_status <= 1'b1;
          else begin
@@ -294,7 +294,7 @@ ps2_intf ps2_keyboard (
 	
 	// Byte-wide data interface - only valid for one clock
 	// so must be latched externally if required
-	.DATA		  ( byte   ),
+	.DATA		  ( kdata  ),
 	.VALID	  ( valid  ),
 	.ERROR	  ( error  )
 );
