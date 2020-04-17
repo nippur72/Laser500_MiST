@@ -43,7 +43,8 @@ module VTL_chip
 	output reg BUZZER,
 	output reg CASOUT,   // mapped I/O bit 2  		
 	
-	input  alt_font
+	input  alt_font,
+	output [2:0] cnt
 );
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
@@ -151,8 +152,10 @@ assign xcnt3 = xcnt + 24+8; // gr1
 
 assign ycnt = vcnt - TOP_BORDER_WIDTH;
 
-wire [2:0] VDC_cnt = hcnt[2:0];       // clock divider and bus slot assignment
+wire [2:0] VDC_cnt = hcnt[2:0];   // clock divider and bus slot assignment
 wire [1:0] CPU_cnt = hcnt[1:0];   // 
+
+assign cnt = VDC_cnt;
 
 assign CPUCK  = VDC_cnt[1];   // derive CPUCK by dividing F14M by 4
 // warning: CPUCK not used, F14M is fed into T80
@@ -163,8 +166,10 @@ wire WR     = ~WR_n;
 wire RD     = ~RD_n;
 wire IORQ   = ~IORQ_n;
 
+/*
 reg WAIT;
 assign WAIT_n = ~WAIT;
+*/
 
 reg MREQ_old;
 reg skip_beat;

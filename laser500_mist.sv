@@ -68,8 +68,8 @@ module laser500_mist
 localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
 	"O1,Scanlines,On,Off;",
-	"O3,Alt. font,Off,On;",
-	"T2,Reset"
+	"O2,Alternative font,Off,On;",
+	"T3,Reset"
 };
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
@@ -78,8 +78,8 @@ wire [7:0] status;       // the status register is controlled by the user_io mod
 
 wire st_poweron  = status[0];
 wire st_scalines = status[1];
-wire st_reset    = status[2];
-wire st_alt_font = status[3];
+wire st_alt_font = status[2];
+wire st_reset    = status[3];
 
 // on screen display
 
@@ -188,8 +188,16 @@ downloader downloader (
 );
 
 // RAM eraser helper
+wire [2:0] hcnt;
+
+wire eraser_busy;
+wire eraser_wr;
+wire [24:0] eraser_addr;
+wire [7:0]  eraser_data;
+
 eraser eraser(
-	.clk      ( F3M         ),
+	.clk      ( F14M        ),
+	.ena      ( hcnt == 6   ),
 	.trigger  ( st_reset    ),	
 	.erasing  ( eraser_busy ),
 	.wr       ( eraser_wr   ),
@@ -347,7 +355,8 @@ VTL_chip VTL_chip
 	.CASOUT       ( CASOUT  ),
 	.CASIN        ( CASIN   ),
 	
-	.alt_font     ( st_alt_font )
+	.alt_font     ( st_alt_font ),
+	.cnt          ( hcnt )
 );
 
 // TODO add scandoubler
@@ -380,20 +389,12 @@ pll pll (
 );
 
 //
-// F14M = 14778730, F3M = 3694682, PAL=50.01 Hz according to user manual and schematic
-// F14M = 14698223, F3M = 3674555, PAL=49.74 Hz - by experimental measure on a real Laser 500 
-// F14M = 14700000, F3m = 3675000, PAL=49.75 Hz on the MiST due to PLL clock rounding
+// F14M = 14778730 on real hardware with 6 clocks cycles skip every 944 ~= 14.698 
+// F14M = 14700000 on the MiST almost close to the original 
 //
 localparam F14M_HZ = 14700000;
 
-// detects menu reset button press on the OSD menu
-wire OSD_reset_pressed = (st_reset == 1 && st_resetD == 0);
-reg st_resetD;
-always @(posedge F14M) begin
-	st_resetD <= st_reset;
-end
-
-wire debug = st_alt_font;
+wire debug = 0;
 
 // debug keyboard on the LED
 always @(posedge F14M) begin
@@ -436,15 +437,13 @@ always @(*) begin
 		sdram_addr = download_addr;
 		sdram_wr   = download_wr;
 		sdram_rd   = 1'b1;
-	end
-	else if(eraser_busy) begin
-		/*
+	end	
+	else if(eraser_busy) begin		
 		sdram_din  = eraser_data;
 		sdram_addr = eraser_addr;
 		sdram_wr   = eraser_wr;
-		sdram_rd   = 1'b1;
-		*/
-	end
+		sdram_rd   = 1'b1;		
+	end	
 	else begin
 		sdram_din  = vdc_sdram_din;
 		sdram_addr = vdc_sdram_addr;
@@ -556,5 +555,3 @@ CASOUT_LPF
 */
 
 endmodule
-
-
