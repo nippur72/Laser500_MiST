@@ -67,8 +67,8 @@ module laser500_mist
 // menu configuration string passed to user_io
 localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
-	"O1,Scanlines,On,Off;",
-	"O2,Alternative font,Off,On;",
+	/*"O1,Scanlines,On,Off;",*/
+	"O2,External charset ROM,Off,On;",
 	"T3,Reset"
 };
 
