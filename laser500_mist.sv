@@ -5,9 +5,9 @@
 // Derived from source code by Till Harbaum (c) 2015
 //
 
-// TODO check horizontal line width 952 vs 947 dox pixels
-// TODO check palette with real hardware
-// TODO check screen geometry with real hardware
+// TODO implement or not delay line on the HYSNC?
+
+// TODO alternate font
 
 // TODO fix sdram jitter problem
 
@@ -68,6 +68,7 @@ module laser500_mist
 localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
 	"O1,Scanlines,On,Off;",
+	"O3,Alt. font,Off,On;",
 	"T2,Reset"
 };
 
@@ -78,6 +79,7 @@ wire [7:0] status;       // the status register is controlled by the user_io mod
 wire st_poweron  = status[0];
 wire st_scalines = status[1];
 wire st_reset    = status[2];
+wire st_alt_font = status[3];
 
 // on screen display
 
@@ -343,7 +345,9 @@ VTL_chip VTL_chip
 	.KD           ( KD      ),	
 	.BUZZER       ( BUZZER  ),
 	.CASOUT       ( CASOUT  ),
-	.CASIN        ( CASIN   )
+	.CASIN        ( CASIN   ),
+	
+	.alt_font     ( st_alt_font )
 );
 
 // TODO add scandoubler
@@ -389,7 +393,7 @@ always @(posedge F14M) begin
 	st_resetD <= st_reset;
 end
 
-wire debug = eraser_busy;
+wire debug = st_alt_font;
 
 // debug keyboard on the LED
 always @(posedge F14M) begin

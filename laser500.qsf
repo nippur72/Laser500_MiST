@@ -168,6 +168,7 @@ set_global_assignment -name VERILOG_FILE downloader.v
 set_global_assignment -name VERILOG_FILE VTL_chip.v
 set_global_assignment -name VERILOG_FILE rom_charset.v
 set_global_assignment -name QIP_FILE rom_charset.qip
+set_global_assignment -name QIP_FILE rom_charset_alternate.qip
 set_global_assignment -name VHDL_FILE dac.vhd
 set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VERILOG_FILE sdram.v

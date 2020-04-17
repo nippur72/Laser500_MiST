@@ -41,7 +41,9 @@ module VTL_chip
 	output [5:0] b,
 	
 	output reg BUZZER,
-	output reg CASOUT   // mapped I/O bit 2  		
+	output reg CASOUT,   // mapped I/O bit 2  		
+	
+	input  alt_font
 );
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
@@ -73,8 +75,6 @@ reg[7:0]  fgbg;           // foreground-background colors for the graphic to dis
 reg[7:0]  ramData;        // data read from RAM
 reg[7:0]  ramDataD;       // data read from RAM at previous step
 reg[13:0] ramAddress;     // address in video RAM to read from
-reg[12:0] charsetAddress; // address in charset ROM to read from
-wire[7:0] charsetQ;       // data ream from charset ROM
 
 reg[7:0]  ramQ;    // test
 
@@ -92,7 +92,6 @@ reg caps_lock_bit           ; // mapped to bit 6
 reg vdc_graphic_mode_enabled; // mapped to bit 3
 
 
-// TODO use real 1bit colors
 parameter col0 = 12'h000;  // black 
 parameter col1 = 12'h00f;  // blue 
 parameter col2 = 12'h080;  // green 
@@ -110,13 +109,25 @@ parameter cold = 12'hf9f;  // bright magenta
 parameter cole = 12'hcf0;  // bright yellow 
 parameter colf = 12'hfff;  // white 
 
+reg[12:0] charsetAddress;
+
+wire[7:0] charsetQ;
+wire[7:0] charsetQ_alt;
+wire[7:0] charsetQ_std; 
+
+assign charsetQ = (!alt_font) ? charsetQ_std : charsetQ_alt;
+
 rom_charset rom_charset (
 	.address(charsetAddress),
 	.clock(F14M),
-	.q(charsetQ)
+	.q(charsetQ_std)
 );							  						
-							  
-// wire[9:0] load_column;    // column where the ramAddress is initialized, changes depending on the video mode
+
+rom_charset_alternate rom_charset_alternate (
+	.address(charsetAddress),
+	.clock(F14M),
+	.q(charsetQ_alt)
+);							  						
 
 wire [3:0] fg;
 wire [3:0] bg;
@@ -173,12 +184,7 @@ always@(posedge F14M) begin
 				vcnt <= 10'd0;				
 			end
 			else 
-				vcnt <= vcnt + 10'd1;
-				
-			/*	
-			if(vcnt == TOP_BORDER_WIDTH-1) ycnt <= 10'd0;
-			else                           ycnt <= ycnt + 10'd1;
-			*/
+				vcnt <= vcnt + 10'd1;				
 		end
 		else hcnt <= hcnt + 10'd1;
 
