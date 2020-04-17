@@ -51,7 +51,7 @@ parameter hbp = 70;         // horizontal back porch, unused time after hsync
 parameter HEIGHT              = 192;  // height of active area  
 parameter TOP_BORDER_WIDTH    =  65;  // top border
 parameter BOTTOM_BORDER_WIDTH =  55;  // bottom
-parameter V                   = 312;  // number of lines
+parameter V                   = 313;  // number of lines
 
 parameter WIDTH               = 640;  // width of active area  
 parameter LEFT_BORDER_WIDTH   =  72;  // left border
