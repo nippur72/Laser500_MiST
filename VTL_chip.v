@@ -44,7 +44,10 @@ module VTL_chip
 	output reg CASOUT,   // mapped I/O bit 2  		
 	
 	input  alt_font,
-	output [2:0] cnt
+	output [2:0] cnt,
+	
+	input          img_mounted, 
+   input   [31:0] img_size    
 );
 
 parameter hfp = 10;         // horizontal front porch, unused time before hsync
@@ -316,7 +319,11 @@ always@(posedge F14M) begin
 						DI[1] <= 1;
 						DI[0] <= 1;
 					end
-								
+					else if(A[7:0] == 'ha0) DI <= img_size[ 7: 0];						
+					else if(A[7:0] == 'ha1) DI <= img_size[15: 8];						
+					else if(A[7:0] == 'ha2) DI <= img_size[23:16];						
+					else if(A[7:0] == 'ha3) DI <= img_size[31:24];						
+					else if(A[7:0] == 'ha4) DI <= { 7'b0, img_mounted };						
 					else
 						DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
 						
