@@ -11,7 +11,6 @@
 
 // TODO fix sdram jitter problem
 
-// TODO power off
 // TODO add scandoubler/scanlines
 // TODO true VGA resolution with downscaler (VESA 720x400@85 Hz pixel clock 35.5 MHz) http://tinyvga.com/vga-timing/720x400@85Hz
 // TODO laser 350/500/700 conf
@@ -19,9 +18,11 @@
 // TODO disk emulation
 // TODO eng/ger/fra keyboard
 // TODO eng/ger/fra video rom
-
+// TODO eng/ita keyboard
 // TODO tap/wav player?
 // TODO add LP filter to tape out?
+// TODO bandpass tape in
+// TODO debug LED on port 0xFF
 								   
 module laser500_mist 
 ( 
@@ -73,19 +74,18 @@ module laser500_mist
 // menu configuration string passed to user_io
 localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
-	"S,D64,Mount disk;",
-	"O2,External charset ROM,Off,On;",
-	"T3,Reset"
+	"S,DSK,Mount disk;",
+	"O2,Custom charset ROM,Off,On;",
+	"T0,Reset"
 };
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
 wire [7:0] status;       // the status register is controlled by the user_io module
 
-wire st_poweron  = status[0];
+wire st_reset    = status[0];
 wire st_scalines = status[1];
 wire st_alt_font = status[2];
-wire st_reset    = status[3];
 
 // on screen display
 
