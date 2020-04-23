@@ -11,6 +11,7 @@
 
 // TODO fix sdram jitter problem
 
+// TODO remove ENA from eraser
 // TODO add scandoubler/scanlines
 // TODO true VGA resolution with downscaler (VESA 720x400@85 Hz pixel clock 35.5 MHz) http://tinyvga.com/vga-timing/720x400@85Hz
 // TODO laser 350/500/700 conf
@@ -90,6 +91,8 @@ wire st_reset    = status[3];
 
 // on screen display
 
+wire F7M = ~hcnt[0];
+
 osd osd (
    .clk_sys    ( F14M         ),	
 
@@ -134,8 +137,8 @@ user_io (
 
 	.status     ( status     ),
 	
-	.clk_sys    ( F14M ),
-	.clk_sd     ( F14M ),
+	.clk_sys    ( F7M ),
+	.clk_sd     ( F7M ),
 	 
 	// ps2 interface
 	.ps2_kbd_clk    ( ps2_kbd_clk    ),
@@ -213,7 +216,7 @@ downloader downloader (
    .ROM_done    ( boot_completed  ),	
 	         
    // external ram interface
-   .clk   ( F14M          ),
+   .clk   ( F7M           ),
    .wr    ( download_wr   ),
    .addr  ( download_addr ),
    .data  ( download_data )
@@ -234,8 +237,8 @@ wire [24:0] eraser_addr;
 wire [7:0]  eraser_data;
 
 eraser eraser(
-	.clk      ( F14M        ),
-	.ena      ( hcnt == 6   ),
+	.clk      ( F7M        ),
+	.ena      ( 1'b1 /*hcnt == 6*/   ),
 	.trigger  ( st_reset    ),	
 	.erasing  ( eraser_busy ),
 	.wr       ( eraser_wr   ),
@@ -464,14 +467,14 @@ always @(*) begin
 		sdram_addr   = download_addr;
 		sdram_wr     = download_wr;
 		sdram_rd     = 1'b1;
-		sdram_clkref = F14M;
+		sdram_clkref = F7M;
 	end	
 	else if(eraser_busy) begin		
 		sdram_din    = eraser_data;
 		sdram_addr   = eraser_addr;
 		sdram_wr     = eraser_wr;
 		sdram_rd     = 1'b1;		
-		sdram_clkref = F14M;
+		sdram_clkref = F7M;
 	end	
 	else begin
 		sdram_din    = vdc_sdram_din;
