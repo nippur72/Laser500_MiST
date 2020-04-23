@@ -76,16 +76,17 @@ localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
 	"S,DSK,Mount disk;",
 	"O2,Custom charset ROM,Off,On;",
-	"T0,Reset"
+	"T3,Reset"
 };
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
 wire [7:0] status;       // the status register is controlled by the user_io module
 
-wire st_reset    = status[0];
+wire st_power_on = status[0];
 wire st_scalines = status[1];
 wire st_alt_font = status[2];
+wire st_reset    = status[3];
 
 // on screen display
 
@@ -484,7 +485,7 @@ end
 
 assign WAIT = 0; 
 
-wire CPU_RESET = ~boot_completed | is_downloading | eraser_busy | reset_key ;
+wire CPU_RESET = ~boot_completed | is_downloading | eraser_busy | reset_key | st_power_on;
 wire BLANK     = ~boot_completed | is_downloading | eraser_busy;
 
 // sdram from zx spectrum core	
