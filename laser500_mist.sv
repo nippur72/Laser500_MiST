@@ -13,6 +13,7 @@
 
 // TODO add scandoubler/scanlines
 // TODO true VGA resolution with downscaler (VESA 720x400@85 Hz pixel clock 35.5 MHz) http://tinyvga.com/vga-timing/720x400@85Hz
+// TODO YPbPr
 // TODO laser 350/500/700 conf
 // TODO tape sounds ON/OFF
 // TODO disk emulation
