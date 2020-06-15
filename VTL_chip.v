@@ -186,7 +186,7 @@ always@(posedge F14M) begin
 	if(RESET) begin
 		hcnt <= 0;  
 		vcnt <= 0;
-		banks[0] <= 0;
+		banks[0] <= 0;		
 	end
 	else begin		   
 		
