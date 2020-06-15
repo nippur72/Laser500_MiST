@@ -4,6 +4,9 @@ Video Technology Laser 350/500/700 for the MiST FPGA
 
 # CHANGELOG
 
+- 15-Jun-2020
+  - support scandoubler and ypbpr output
+
 - 17-Apr-2020
   - Reset from OSD menu
   - (experimental) External charset ROM
