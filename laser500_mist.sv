@@ -6,14 +6,9 @@
 //
 
 // TODO implement or not delay line on the HYSNC?
-
 // TODO alternate font
-
 // TODO fix sdram jitter problem
-
-// TODO add scandoubler/scanlines
 // TODO true VGA resolution with downscaler (VESA 720x400@85 Hz pixel clock 35.5 MHz) http://tinyvga.com/vga-timing/720x400@85Hz
-// TODO YPbPr
 // TODO laser 350/500/700 conf
 // TODO tape sounds ON/OFF
 // TODO disk emulation
@@ -72,6 +67,52 @@ module laser500_mist
 /******************************************************************************************/
 /******************************************************************************************/
 
+mist_video 
+#
+(
+	.SYNC_AND(1)
+) 
+mist_video
+(
+	.clk_sys(F14Mx2),           // twice the F14M clock for the scandoubler
+
+	// OSD SPI interface
+   .SPI_DI(SPI_DI),
+   .SPI_SCK(SPI_SCK),
+   .SPI_SS3(SPI_SS3),
+
+	.scanlines(2'b00),           // scanlines (00-none 01-25% 10-50% 11-75%)	
+	.ce_divider(1),              // non-scandoubled pixel clock divider 0 - clk_sys/4, 1 - clk_sys/2
+
+	.scandoubler_disable(scandoubler_disable),  // 0 = HVSync 31KHz, 1 = CSync 15KHz	
+	.no_csync(no_csync),                        // 1 = disable csync without scandoubler	
+	.ypbpr(ypbpr),                              // 1 = YPbPr output on composite sync
+	
+	.rotate(2'b00),              // Rotate OSD [0] - rotate [1] - left or right	
+	.blend(0),                   // composite-like blending
+
+	// video input
+	.R(video_r),
+	.G(video_g),
+	.B(video_b),
+	.HSync(video_hs),
+	.VSync(video_vs),
+	
+	// MiST video output signals
+	.VGA_R(VGA_R),
+	.VGA_G(VGA_G),
+	.VGA_B(VGA_B),
+	.VGA_VS(VGA_VS),
+	.VGA_HS(VGA_HS)
+);
+
+
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** @user_io ***************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+
 // menu configuration string passed to user_io
 localparam CONF_STR = {
 	"LASER500;PRG;", // must be UPPERCASE        
@@ -88,37 +129,14 @@ wire st_power_on = status[0];
 wire st_scalines = status[1];
 wire st_alt_font = status[2];
 wire st_reset    = status[3];
-
-// on screen display
-
-osd osd (
-   .clk_sys    ( F14M         ),	
-
-   // spi for OSD
-   .SPI_DI     ( SPI_DI       ),
-   .SPI_SCK    ( SPI_SCK      ),
-   .SPI_SS3    ( SPI_SS3      ),
-
-   .R_in       ( video_r      ),
-   .G_in       ( video_g      ),
-   .B_in       ( video_b      ),
-   .HSync      ( video_hs     ),
-   .VSync      ( video_vs     ),
-
-   .R_out      ( VGA_R        ),
-   .G_out      ( VGA_G        ),
-   .B_out      ( VGA_B        )   
-);
-
-
-/******************************************************************************************/
-/******************************************************************************************/
-/***************************************** @user_io ***************************************/
-/******************************************************************************************/
-/******************************************************************************************/
        
 wire [31:0] joystick_0;
 wire [31:0] joystick_1;
+
+wire scandoubler_disable;
+wire ypbpr;
+wire no_csync;
+
 
 user_io #
 (
@@ -135,18 +153,17 @@ user_io (
 
 	.status     ( status     ),
 	
+	.scandoubler_disable ( scandoubler_disable ),
+	.ypbpr               ( ypbpr               ),
+	.no_csync            ( no_csync            ),	
+	
 	.clk_sys    ( F14M ),
 	.clk_sd     ( F14M ),
 	 
 	// ps2 interface
 	.ps2_kbd_clk    ( ps2_kbd_clk    ),
 	.ps2_kbd_data   ( ps2_kbd_data   ),
-	
-	/*
-	.ps2_mouse_clk  ( ps2_mouse_clk  ),
-	.ps2_mouse_data ( ps2_mouse_data ),
-	*/ 
-	
+		
 	.joystick_0 ( joystick_0 ),
 	.joystick_1 ( joystick_1 ),
 	
@@ -394,10 +411,6 @@ VTL_chip VTL_chip
 
 );
 
-// TODO add scandoubler
-assign VGA_HS = ~(~video_hs | ~video_vs);
-assign VGA_VS = 1;
-
 
 /******************************************************************************************/
 /******************************************************************************************/
@@ -411,12 +424,15 @@ assign VGA_VS = 1;
 
 wire pll_locked;
 
+wire F14Mx2;
+
 pll pll (
 	 .inclk0 ( CLOCK_27[0]   ),
 	 .locked ( pll_locked    ),        // PLL is running stable
 	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
 	 .c1     ( ram_clock     ),        // F14M x 4 	 
-	 .c2     ( F3M           )         // F14M / 4 	 
+	 .c2     ( F3M           ),        // F14M / 4 
+    .c3     ( F14Mx2        )	        // F14M x 2 for the scandoubler 
 );
 
 //
