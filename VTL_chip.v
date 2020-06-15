@@ -50,9 +50,14 @@ module VTL_chip
    input   [31:0] img_size    
 );
 
-parameter hfp = 10;         // horizontal front porch, unused time before hsync
-parameter hsw = 66;         // hsync width
-parameter hbp = 70;         // horizontal back porch, unused time after hsync
+reg [7:0] hfp = 10;         // horizontal front porch, unused time before hsync
+reg [7:0] hsw = 66;         // hsync width
+reg [7:0] hbp = 70;         // horizontal back porch, unused time after hsync
+
+
+//parameter hfp = 10;         // horizontal front porch, unused time before hsync
+//parameter hsw = 66;         // hsync width
+//parameter hbp = 70;         // horizontal back porch, unused time after hsync
 
 parameter HEIGHT              = 192;  // height of active area  
 parameter TOP_BORDER_WIDTH    =  65;  // top border
@@ -319,11 +324,16 @@ always@(posedge F14M) begin
 						DI[1] <= 1;
 						DI[0] <= 1;
 					end
+					/*
 					else if(A[7:0] == 'ha0) DI <= img_size[ 7: 0];						
 					else if(A[7:0] == 'ha1) DI <= img_size[15: 8];						
 					else if(A[7:0] == 'ha2) DI <= img_size[23:16];						
 					else if(A[7:0] == 'ha3) DI <= img_size[31:24];						
 					else if(A[7:0] == 'ha4) DI <= { 7'b0, img_mounted };						
+					*/
+					else if(A[7:0] == 'ha0) DI <= hsw;						
+					else if(A[7:0] == 'ha1) DI <= hbp;						
+					else if(A[7:0] == 'ha2) DI <= hfp;						
 					else
 						DI <= { DI[7:1], 1'b1 }; // value returned from unused ports
 						
@@ -368,6 +378,10 @@ always@(posedge F14M) begin
 						'h12: ;
 						'h13: ;
 						'h14: ;
+					   'ha0: hsw <= DO;						
+					   'ha1: hbp <= DO;						
+					   'ha2: hfp <= DO;						
+						
 							//if(emulate_fdc) floppy_write_port(port & 0xFF, value); 
 							//return;     				
 					endcase				
