@@ -156,6 +156,7 @@ set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 
+set_global_assignment -name SYSTEMVERILOG_FILE downloader.sv
 set_global_assignment -name VERILOG_FILE "mist-modules/sd_card.v"
 set_global_assignment -name SYSTEMVERILOG_FILE "mist-modules/rgb2ypbpr.sv"
 set_global_assignment -name VERILOG_FILE "mist-modules/mist_video.v"
@@ -173,7 +174,6 @@ set_global_assignment -name VERILOG_FILE "mist-modules/data_io.v"
 set_global_assignment -name VERILOG_FILE "mist-modules/osd.v"
 set_global_assignment -name VERILOG_FILE "mist-modules/user_io.v"
 set_global_assignment -name VERILOG_FILE "mist-modules/scandoubler.v"
-set_global_assignment -name VERILOG_FILE downloader.v
 set_global_assignment -name VERILOG_FILE VTL_chip.v
 set_global_assignment -name VERILOG_FILE rom_charset.v
 set_global_assignment -name QIP_FILE rom_charset.qip

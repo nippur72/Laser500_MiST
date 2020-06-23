@@ -216,7 +216,15 @@ wire        download_wr;
 wire        boot_completed;
 
 // ROM download helper
-downloader downloader (
+downloader 
+#
+(
+	.ROM_START_ADDR(25'h0),               // start of ROM in SDRAM
+	.PRG_START_ADDR(25'h10000 + 25'h995), // start of PRG in SDRAM (0x8995)
+	.PTR_END_BASE('h8995),                // base value to sum to END pointer (0x8995)
+	.PTR_PROGND(25'h10000 + 25'h3E9)      // SDRAM address of END pointer (0x83e9)
+)
+downloader (
 	
 	// new SPI interface
    .SPI_DO ( SPI_DO  ),
@@ -232,6 +240,7 @@ downloader downloader (
 	         
    // external ram interface
    .clk   ( F14M          ),
+	.clk_ena(1),
    .wr    ( download_wr   ),
    .addr  ( download_addr ),
    .data  ( download_data )
@@ -251,7 +260,14 @@ wire eraser_wr;
 wire [24:0] eraser_addr;
 wire [7:0]  eraser_data;
 
-eraser eraser(
+eraser 
+#(
+	// erases from page 3 to page 7 (all 64K RAM)
+	.START_RAM( { 7'd0, 4'h3, 14'b0 }),  
+	.END_RAM  ( { 7'd0, 4'h8, 14'b0 })  
+)
+eraser
+(
 	.clk      ( F14M        ),
 	.ena      ( hcnt == 6   ),
 	.trigger  ( st_reset    ),	
@@ -476,7 +492,7 @@ wire [7:0]  sdram_dout   ;
 wire [7:0]  sdram_din    ; 
 
 always @(*) begin
-	if(is_downloading) begin
+	if(is_downloading && download_wr) begin
 		sdram_din    = download_data;
 		sdram_addr   = download_addr;
 		sdram_wr     = download_wr;

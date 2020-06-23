@@ -17,9 +17,8 @@ module eraser(
 
 reg [24:0] pos;
 
-// erases from page 3 to page 7 (all 64K RAM)
-localparam [24:0] START_RAM = { 7'd0, 4'h3, 14'b0 };  // 25'h10000 + 25'h99a;
-localparam [24:0] END_RAM   = { 7'd0, 4'h8, 14'b0 };  // 25'h10000 + 25'h99d; 
+parameter [24:0] START_RAM;
+parameter [24:0] END_RAM;
 
 // detect trigger
 always @(posedge clk) begin
