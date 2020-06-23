@@ -153,7 +153,9 @@ user_io (
 	.SPI_MOSI   ( SPI_DI     ),
 
 	.status     ( status     ),
-	
+	.buttons    ( buttons    ),
+	.switches   ( switches   ),
+		
 	.scandoubler_disable ( scandoubler_disable ),
 	.ypbpr               ( ypbpr               ),
 	.no_csync            ( no_csync            ),	
@@ -240,11 +242,11 @@ downloader (
    .ROM_done    ( boot_completed  ),	
 	         
    // external ram interface
-   .clk   ( F14M          ),
-	.clk_ena(1),
-   .wr    ( download_wr   ),
-   .addr  ( download_addr ),
-   .data  ( download_data )
+   .clk    ( F3M           ),
+	.clk_ena( 1             ),
+   .wr     ( download_wr   ),
+   .addr   ( download_addr ),
+   .data   ( download_data )
 );
 
 
@@ -269,8 +271,8 @@ eraser
 )
 eraser
 (
-	.clk      ( F14M        ),
-	.ena      ( hcnt == 6   ),
+	.clk      ( F3M         ),
+	.ena      ( 1           ),
 	.trigger  ( st_reset    ),	
 	.erasing  ( eraser_busy ),
 	.wr       ( eraser_wr   ),
@@ -425,7 +427,6 @@ VTL_chip VTL_chip
 	
 	.img_mounted  ( img_mounted ),
 	.img_size     ( img_size    ) 
-
 );
 
 
