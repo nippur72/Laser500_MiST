@@ -448,9 +448,10 @@ pll pll (
 	 .inclk0 ( CLOCK_27[0]   ),
 	 .locked ( pll_locked    ),        // PLL is running stable
 	 .c0     ( F14M          ),        // video generator clock frequency 14.77873 MHz
-	 .c1     ( ram_clock     ),        // F14M x 4 	 
+	 .c1     ( SDRAM_CLK     ),        // F14M x 8, phase shifted 	 
 	 .c2     ( F3M           ),        // F14M / 4 
-    .c3     ( F14Mx2        )	        // F14M x 2 for the scandoubler 
+    .c3     ( F14Mx2        ),        // F14M x 2 for the scandoubler 
+	 .c4     ( ram_clock     )         // F14M x 8, phase shifted 	 
 );
 
 //
@@ -466,6 +467,14 @@ always @(posedge F14M) begin
 	LED_ON <= debug;
 end
 
+/******************************************************************************************/
+/******************************************************************************************/
+/***************************************** @ena *******************************************/
+/******************************************************************************************/
+/******************************************************************************************/
+
+
+  
 
 /******************************************************************************************/
 /******************************************************************************************/
@@ -484,7 +493,7 @@ assign LED = ~LED_ON;
 // SDRAM control signals
 wire ram_clock;
 assign SDRAM_CKE = pll_locked; // was: 1'b1;
-assign SDRAM_CLK = ram_clock;
+//assign SDRAM_CLK = ram_clock;
 
 wire        sdram_clkref ;
 wire [24:0] sdram_addr   ;
