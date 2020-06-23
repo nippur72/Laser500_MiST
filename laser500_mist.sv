@@ -123,12 +123,14 @@ localparam CONF_STR = {
 
 localparam CONF_STR_LEN = $size(CONF_STR)>>3;
 
-wire [7:0] status;       // the status register is controlled by the user_io module
+wire [7:0] status;       
+wire [1:0] buttons;
+wire [1:0] switches;
 
 wire st_power_on = status[0];
 wire st_scalines = status[1];
 wire st_alt_font = status[2];
-wire st_reset    = status[3];
+wire st_reset    = status[3] | buttons[1];
        
 wire [31:0] joystick_0;
 wire [31:0] joystick_1;
