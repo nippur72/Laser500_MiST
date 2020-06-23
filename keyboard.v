@@ -182,6 +182,7 @@ always @(posedge clk) begin
 				
 				case(key)	
                KEY_RESET        : begin reset_key <= ~key_status; end													
+					KEY_ALT_LEFT     : begin reset_key <= ~key_status; end													
 					KEY_SHIFT        : begin KM['h0][6] <= key_status; end
 					KEY_SHIFT_RIGHT  : begin KM['h0][6] <= key_status; end
 					KEY_Z            : begin KM['h0][5] <= key_status; end 
