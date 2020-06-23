@@ -6,7 +6,6 @@
 //
 
 // TODO implement or not delay line on the HYSNC?
-// TODO alternate font
 // TODO fix sdram jitter problem
 // TODO true VGA resolution with downscaler (VESA 720x400@85 Hz pixel clock 35.5 MHz) http://tinyvga.com/vga-timing/720x400@85Hz
 // TODO laser 350/500/700 conf
