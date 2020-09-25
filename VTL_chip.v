@@ -146,7 +146,7 @@ assign hsync = (hcnt < hsw) ? 0 : 1;
 assign vsync = (vcnt <   2) ? 0 : 1;
 
 //wire non_visible_area = hcnt < hsw+hbp || vcnt < 64 || vcnt > 250 || hcnt >= hsw+hbp+H;                        
-wire non_visible_area = hcnt < hsw+hbp || vcnt < 8 || vcnt > (312-8) || hcnt >= hsw+hbp+H;
+wire non_visible_area = hcnt < hsw+hbp || vcnt < 4 || vcnt > (312-2) || hcnt >= hsw+hbp+H;
 						  
 // calculate foreground and background colors						  
 assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || (!vdc_graphic_mode_enabled && vdc_text80_enabled) ? vdc_text80_foreground : fgbg[7:4];
