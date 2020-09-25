@@ -143,9 +143,10 @@ wire [3:0] bg;
 
 // generate negative hsync and vsync signals
 assign hsync = (hcnt < hsw) ? 0 : 1;
-assign vsync = (vcnt <   4) ? 0 : 1;
+assign vsync = (vcnt <   2) ? 0 : 1;
 
-wire non_visible_area = hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H;
+//wire non_visible_area = hcnt < hsw+hbp || vcnt < 64 || vcnt > 250 || hcnt >= hsw+hbp+H;                        
+wire non_visible_area = hcnt < hsw+hbp || vcnt < 8 || vcnt > (312-8) || hcnt >= hsw+hbp+H;
 						  
 // calculate foreground and background colors						  
 assign fg = (vdc_graphic_mode_enabled && (vdc_graphic_mode_number == 5 || vdc_graphic_mode_number == 2)) || (!vdc_graphic_mode_enabled && vdc_text80_enabled) ? vdc_text80_foreground : fgbg[7:4];
@@ -389,7 +390,7 @@ always@(posedge F14M) begin
 			end		
 								
 			// draw pixel at hcnt,vcnt, graphic data contained in "char"
-			if(hcnt < hsw+hbp || vcnt < 2 || hcnt >= hsw+hbp+H) 
+			if(non_visible_area) 
 				pixel <= 0;   // blanking zone 
 			else if( (vcnt < TOP_BORDER_WIDTH || vcnt >= TOP_BORDER_WIDTH + HEIGHT) || 
 						(hcnt < hsw+hbp + LEFT_BORDER_WIDTH || hcnt >= hsw+hbp + LEFT_BORDER_WIDTH + WIDTH)) 
