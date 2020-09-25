@@ -69,7 +69,8 @@ module laser500_mist
 mist_video 
 #
 (
-	.SYNC_AND(1)
+	.SYNC_AND(1),
+	.SD_HCNT_WIDTH(11)
 ) 
 mist_video
 (
